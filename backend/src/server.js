@@ -38,7 +38,7 @@ const indexFile = path.join(distPath, "index.html");
 
 if (fs.existsSync(indexFile)) {
   app.use(express.static(distPath));
-  app.get("*", (_req, res) => res.sendFile(indexFile));
+  app.get(/.*/, (_req, res) => res.sendFile(indexFile));
 }
 
 const startServer = async () => {
