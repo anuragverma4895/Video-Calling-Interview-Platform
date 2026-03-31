@@ -2,8 +2,8 @@ services:
   - type: web
     name: video-calling-interview-platform
     runtime: node
-    startCommand: cd backend && node src/server.js
-    buildCommand: npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend
+    startCommand: yarn run render-start
+    buildCommand: yarn run render-build
     envVars:
       - key: NODE_ENV
         value: production
