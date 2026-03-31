@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
-    "start": "node index.js"
+    "start": "cd backend && node src/server.js"
   },
   "keywords": [],
   "author": "",
