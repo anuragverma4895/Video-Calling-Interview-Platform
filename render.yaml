@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: talent-iq-app
+    runtime: node
+    startCommand: npm start
+    buildCommand: npm run build
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DB_URL
+        scope: all
+      - key: CLIENT_URL
+        scope: all
+      - key: INNGEST_EVENT_KEY
+        scope: all
+      - key: INNGEST_SIGNING_KEY
+        scope: all
+      - key: STREAM_API_KEY
+        scope: all
+      - key: STREAM_API_SECRET
+        scope: all
