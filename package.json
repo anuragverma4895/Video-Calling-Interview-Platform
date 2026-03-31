@@ -4,7 +4,7 @@
   "main": "backend/src/server.js",
   "type": "module",
   "scripts": {
-    "postinstall": "npm install --prefix backend && npm install --prefix frontend",
+    "postinstall": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
     "render-build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
     "build": "npm run render-build",
     "render-start": "cd backend && node src/server.js",

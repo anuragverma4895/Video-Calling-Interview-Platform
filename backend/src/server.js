@@ -36,9 +36,25 @@ app.get("/health", (req, res) => {
 const distPath = path.join(__dirname, "../../frontend/dist");
 const indexFile = path.join(distPath, "index.html");
 
+console.log("==== PATH DEBUGGING ====");
+console.log("__dirname:", __dirname);
+console.log("distPath:", distPath);
+console.log("indexFile path:", indexFile);
+console.log("indexFile exists:", fs.existsSync(indexFile));
+console.log("========================");
+
 if (fs.existsSync(indexFile)) {
   app.use(express.static(distPath));
   app.get(/.*/, (_req, res) => res.sendFile(indexFile));
+} else {
+  app.get(/.*/, (_req, res) => {
+    res.status(404).json({
+      message: "Frontend dist not found. The React app is not correctly built or located.",
+      distPath,
+      indexFile,
+      cwd: process.cwd()
+    });
+  });
 }
 
 const startServer = async () => {
