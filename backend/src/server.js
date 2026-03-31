@@ -2,9 +2,9 @@ import express from "express";
 import path from "path";
 import fs from "fs";
 import cors from "cors";
+import { fileURLToPath } from "url";
 import { serve } from "inngest/express";
 import { clerkMiddleware } from "@clerk/express";
-import { fileURLToPath } from "url";
 
 import { ENV } from "./lib/env.js";
 import { connectDB } from "./lib/db.js";
