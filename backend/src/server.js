@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import cors from "cors";
 import { serve } from "inngest/express";
 import { clerkMiddleware } from "@clerk/express";
@@ -29,14 +30,13 @@ app.get("/health", (req, res) => {
   res.status(200).json({ msg: "api is up and running" });
 });
 
-// make our app ready for deployment
-// when running from backend/, dist lives at ../frontend/dist relative to repo root
-if (ENV.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../../frontend/dist")));
+// Serve frontend build when present (Render or any prod build)
+const distPath = path.join(__dirname, "../../frontend/dist");
+const indexFile = path.join(distPath, "index.html");
 
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../../frontend/dist/index.html"));
-  });
+if (fs.existsSync(indexFile)) {
+  app.use(express.static(distPath));
+  app.get("*", (_req, res) => res.sendFile(indexFile));
 }
 
 const startServer = async () => {
