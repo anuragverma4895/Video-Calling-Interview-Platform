@@ -1,5 +1,5 @@
 {
-  "name": "talent-iq",
+  "name": "video-calling-interview-platform",
   "version": "1.0.0",
   "main": "backend/src/server.js",
   "type": "module",

@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: talent-iq-app
+    name: video-calling-interview-platform
     runtime: node
     startCommand: cd backend && node src/server.js
     buildCommand: npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend
