@@ -4,6 +4,7 @@ import fs from "fs";
 import cors from "cors";
 import { serve } from "inngest/express";
 import { clerkMiddleware } from "@clerk/express";
+import { fileURLToPath } from "url";
 
 import { ENV } from "./lib/env.js";
 import { connectDB } from "./lib/db.js";
@@ -14,7 +15,8 @@ import sessionRoutes from "./routes/sessionRoute.js";
 
 const app = express();
 
-const __dirname = path.resolve();
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // middleware
 app.use(express.json());
