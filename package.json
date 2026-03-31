@@ -4,7 +4,8 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
+    "postinstall": "npm install --prefix backend && npm install --prefix frontend",
+    "build": "npm run postinstall && npm run build --prefix frontend",
     "start": "cd backend && node src/server.js"
   },
   "keywords": [],

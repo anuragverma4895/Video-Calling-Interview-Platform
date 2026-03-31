@@ -30,11 +30,12 @@ app.get("/health", (req, res) => {
 });
 
 // make our app ready for deployment
+// when running from backend/, dist lives at ../frontend/dist relative to repo root
 if (ENV.NODE_ENV === "production") {
-  app.use(express.static(path.join(__dirname, "../frontend/dist")));
+  app.use(express.static(path.join(__dirname, "../../frontend/dist")));
 
   app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "../frontend/dist/index.html"));
+    res.sendFile(path.join(__dirname, "../../frontend/dist/index.html"));
   });
 }
 
