@@ -41,6 +41,7 @@ export async function createSession(req, res) {
   }
 }
 
+// /differnt code time 3:15 minute
 export async function getActiveSessions(_, res) {
   try {
     const sessions = await Session.find({ status: "active" })
