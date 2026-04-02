@@ -1,6 +1,12 @@
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
-dotenv.config({ quiet: true });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Always resolve .env relative to this file (backend/src/lib/env.js → backend/.env)
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 export const ENV = {
   PORT: process.env.PORT || 3000,
