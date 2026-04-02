@@ -30,6 +30,7 @@ export async function createSession(req, res) {
       name: `${problem} Session`,
       created_by_id: clerkId,
       members: [clerkId],
+      distinct: false,
     });
 
     await channel.create();
