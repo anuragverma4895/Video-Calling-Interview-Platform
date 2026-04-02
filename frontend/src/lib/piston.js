@@ -1,11 +1,11 @@
-// Piston API is a service for code execution
+// We use Wandbox API instead of Piston since EMKC Piston now requires an API key.
 
-const PISTON_API = "https://emkc.org/api/v2/piston";
+const WANDBOX_API = "https://wandbox.org/api/compile.json";
 
 const LANGUAGE_VERSIONS = {
-  javascript: { language: "javascript", version: "18.15.0" },
-  python: { language: "python", version: "3.10.0" },
-  java: { language: "java", version: "15.0.2" },
+  javascript: { compiler: "nodejs-head" },
+  python: { compiler: "cpython-head" },
+  java: { compiler: "openjdk-head" },
 };
 
 /**
@@ -24,20 +24,14 @@ export async function executeCode(language, code) {
       };
     }
 
-    const response = await fetch(`${PISTON_API}/execute`, {
+    const response = await fetch(WANDBOX_API, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        language: languageConfig.language,
-        version: languageConfig.version,
-        files: [
-          {
-            name: `main.${getFileExtension(language)}`,
-            content: code,
-          },
-        ],
+        compiler: languageConfig.compiler,
+        code: code,
       }),
     });
 
@@ -50,14 +44,15 @@ export async function executeCode(language, code) {
 
     const data = await response.json();
 
-    const output = data.run.output || "";
-    const stderr = data.run.stderr || "";
+    // Wandbox returns outputs in program_message and errors in program_error / compiler_error
+    const output = data.program_message || "";
+    const stderr = data.program_error || data.compiler_error || "";
 
-    if (stderr) {
+    if (data.status !== "0" || stderr) {
       return {
         success: false,
         output: output,
-        error: stderr,
+        error: stderr || `Process exited with status ${data.status}`,
       };
     }
 

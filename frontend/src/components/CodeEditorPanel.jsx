@@ -56,6 +56,7 @@ function CodeEditorPanel({
             scrollBeyondLastLine: false,
             automaticLayout: true,
             minimap: { enabled: false },
+            scrollbar: { alwaysConsumeMouseWheel: false },
           }}
         />
       </div>
