@@ -91,7 +91,10 @@ function HomePage() {
                 </button>
               </SignInButton>
 
-              <button className="btn btn-outline btn-lg">
+              <button 
+                className="btn btn-outline btn-lg"
+                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
+              >
                 <VideoIcon className="size-5" />
                 Watch Demo
               </button>
@@ -124,7 +127,7 @@ function HomePage() {
       </div>
 
       {/* FEATURES SECTION */}
-      <div className="max-w-7xl mx-auto px-4 py-20">
+      <div id="features" className="max-w-7xl mx-auto px-4 py-20">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold mb-4">
             Everything You Need to <span className="text-primary font-mono">Succeed</span>
