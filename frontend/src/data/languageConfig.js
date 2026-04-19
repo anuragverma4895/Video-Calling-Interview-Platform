@@ -1,19 +1,3 @@
-import { EASY_PROBLEMS_1 } from "./easyProblems1.js";
-import { EASY_PROBLEMS_2 } from "./easyProblems2.js";
-import { EASY_PROBLEMS_3 } from "./easyProblems3.js";
-import { MEDIUM_PROBLEMS_1 } from "./mediumProblems1.js";
-import { MEDIUM_PROBLEMS_2 } from "./mediumProblems2.js";
-import { HARD_PROBLEMS } from "./hardProblems.js";
-
-export const PROBLEMS = {
-  ...EASY_PROBLEMS_1,
-  ...EASY_PROBLEMS_2,
-  ...EASY_PROBLEMS_3,
-  ...MEDIUM_PROBLEMS_1,
-  ...MEDIUM_PROBLEMS_2,
-  ...HARD_PROBLEMS,
-};
-
 export const LANGUAGE_CONFIG = {
   javascript: {
     name: "JavaScript",
@@ -21,7 +5,7 @@ export const LANGUAGE_CONFIG = {
     monacoLang: "javascript",
     pistonLang: "javascript",
     pistonVersion: "18.15.0",
-    fileExt: ".js",
+    extension: "js",
   },
   python: {
     name: "Python",
@@ -29,7 +13,7 @@ export const LANGUAGE_CONFIG = {
     monacoLang: "python",
     pistonLang: "python",
     pistonVersion: "3.10.0",
-    fileExt: ".py",
+    extension: "py",
   },
   java: {
     name: "Java",
@@ -37,7 +21,7 @@ export const LANGUAGE_CONFIG = {
     monacoLang: "java",
     pistonLang: "java",
     pistonVersion: "15.0.2",
-    fileExt: ".java",
+    extension: "java",
   },
   c: {
     name: "C",
@@ -45,7 +29,7 @@ export const LANGUAGE_CONFIG = {
     monacoLang: "c",
     pistonLang: "c",
     pistonVersion: "10.2.0",
-    fileExt: ".c",
+    extension: "c",
   },
   cpp: {
     name: "C++",
@@ -53,6 +37,6 @@ export const LANGUAGE_CONFIG = {
     monacoLang: "cpp",
     pistonLang: "c++",
     pistonVersion: "10.2.0",
-    fileExt: ".cpp",
+    extension: "cpp",
   },
 };

@@ -1,8 +1,6 @@
 import express from "express";
 import path from "path";
-import fs from "fs";
 import cors from "cors";
-import { fileURLToPath } from "url";
 import { serve } from "inngest/express";
 import { clerkMiddleware } from "@clerk/express";
 
@@ -12,12 +10,11 @@ import { inngest, functions } from "./lib/inngest.js";
 
 import chatRoutes from "./routes/chatRoutes.js";
 import sessionRoutes from "./routes/sessionRoute.js";
-import executeRoutes from "./routes/executeRoute.js";
+import executeRoute from "./routes/executeRoute.js";
 
 const app = express();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __dirname = path.resolve();
 
 // middleware
 app.use(express.json());
@@ -28,34 +25,18 @@ app.use(clerkMiddleware()); // this adds auth field to request object: req.auth(
 app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/api/chat", chatRoutes);
 app.use("/api/sessions", sessionRoutes);
-app.use("/api/execute", executeRoutes);
+app.use("/api/execute", executeRoute);
 
 app.get("/health", (req, res) => {
   res.status(200).json({ msg: "api is up and running" });
 });
 
-// Serve frontend build when present (Render or any prod build)
-const distPath = path.join(__dirname, "../../frontend/dist");
-const indexFile = path.join(distPath, "index.html");
+// make our app ready for deployment
+if (ENV.NODE_ENV === "production") {
+  app.use(express.static(path.join(__dirname, "../frontend/dist")));
 
-console.log("==== PATH DEBUGGING ====");
-console.log("__dirname:", __dirname);
-console.log("distPath:", distPath);
-console.log("indexFile path:", indexFile);
-console.log("indexFile exists:", fs.existsSync(indexFile));
-console.log("========================");
-
-if (fs.existsSync(indexFile)) {
-  app.use(express.static(distPath));
-  app.get(/.*/, (_req, res) => res.sendFile(indexFile));
-} else {
-  app.get(/.*/, (_req, res) => {
-    res.status(404).json({
-      message: "Frontend dist not found. The React app is not correctly built or located.",
-      distPath,
-      indexFile,
-      cwd: process.cwd()
-    });
+  app.get("/{*any}", (req, res) => {
+    res.sendFile(path.join(__dirname, "../frontend", "dist", "index.html"));
   });
 }
 

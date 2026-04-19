@@ -1,14 +1,10 @@
 {
-  "name": "video-calling-interview-platform",
+  "name": "talent-iq",
   "version": "1.0.0",
-  "main": "backend/src/server.js",
-  "type": "module",
+  "main": "index.js",
   "scripts": {
-    "postinstall": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
-    "render-build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
-    "build": "npm run render-build",
-    "render-start": "cd backend && node src/server.js",
-    "start": "node index.js"
+    "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
+    "start": "npm run start --prefix backend"
   },
   "keywords": [],
   "author": "",

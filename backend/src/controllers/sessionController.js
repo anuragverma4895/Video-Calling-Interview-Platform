@@ -30,7 +30,6 @@ export async function createSession(req, res) {
       name: `${problem} Session`,
       created_by_id: clerkId,
       members: [clerkId],
-      distinct: false,
     });
 
     await channel.create();
@@ -42,7 +41,6 @@ export async function createSession(req, res) {
   }
 }
 
-// /differnt code time 3:15 minute
 export async function getActiveSessions(_, res) {
   try {
     const sessions = await Session.find({ status: "active" })
@@ -120,11 +118,6 @@ export async function joinSession(req, res) {
 
     const channel = chatClient.channel("messaging", session.callId);
     await channel.addMembers([clerkId]);
-
-    // Give the participant explicit access to video/audio controls
-    await streamClient.video.call("default", session.callId).updateCallMembers({
-      update_members: [{ user_id: clerkId, role: "call_member" }],
-    });
 
     res.status(200).json({ session });
   } catch (error) {

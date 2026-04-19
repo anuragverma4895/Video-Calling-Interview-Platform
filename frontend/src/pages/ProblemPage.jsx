@@ -18,9 +18,11 @@ function ProblemPage() {
 
   const [currentProblemId, setCurrentProblemId] = useState("two-sum");
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
-  const [code, setCode] = useState(PROBLEMS[currentProblemId].starterCode.javascript);
+  const [code, setCode] = useState(PROBLEMS[currentProblemId]?.starterCode?.javascript || "");
   const [output, setOutput] = useState(null);
+  const [submitResult, setSubmitResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const currentProblem = PROBLEMS[currentProblemId];
 
@@ -28,16 +30,18 @@ function ProblemPage() {
   useEffect(() => {
     if (id && PROBLEMS[id]) {
       setCurrentProblemId(id);
-      setCode(PROBLEMS[id].starterCode[selectedLanguage]);
+      setCode(PROBLEMS[id].starterCode?.[selectedLanguage] || "// No starter code available");
       setOutput(null);
+      setSubmitResult(null);
     }
   }, [id, selectedLanguage]);
 
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
     setSelectedLanguage(newLang);
-    setCode(currentProblem.starterCode[newLang]);
+    setCode(currentProblem.starterCode?.[newLang] || "// No starter code available for this language");
     setOutput(null);
+    setSubmitResult(null);
   };
 
   const handleProblemChange = (newProblemId) => navigate(`/problem/${newProblemId}`);
@@ -57,17 +61,14 @@ function ProblemPage() {
   };
 
   const normalizeOutput = (output) => {
-    // normalize output for comparison (trim whitespace, handle different spacing)
     return output
       .trim()
       .split("\n")
       .map((line) =>
         line
           .trim()
-          // remove spaces after [ and before ]
           .replace(/\[\s+/g, "[")
           .replace(/\s+\]/g, "]")
-          // normalize spaces around commas to single space after comma
           .replace(/\s*,\s*/g, ",")
       )
       .filter((line) => line.length > 0)
@@ -77,33 +78,110 @@ function ProblemPage() {
   const checkIfTestsPassed = (actualOutput, expectedOutput) => {
     const normalizedActual = normalizeOutput(actualOutput);
     const normalizedExpected = normalizeOutput(expectedOutput);
-
     return normalizedActual == normalizedExpected;
   };
 
   const handleRunCode = async () => {
     setIsRunning(true);
     setOutput(null);
+    setSubmitResult(null);
 
     const result = await executeCode(selectedLanguage, code);
     setOutput(result);
     setIsRunning(false);
 
-    // check if code executed successfully and matches expected output
-
     if (result.success) {
-      const expectedOutput = currentProblem.expectedOutput[selectedLanguage];
-      const testsPassed = checkIfTestsPassed(result.output, expectedOutput);
-
-      if (testsPassed) {
-        triggerConfetti();
-        toast.success("All tests passed! Great job!");
-      } else {
-        toast.error("Tests failed. Check your output!");
+      const expectedOutput = currentProblem.expectedOutput?.[selectedLanguage];
+      if (expectedOutput) {
+        const testsPassed = checkIfTestsPassed(result.output, expectedOutput);
+        if (testsPassed) {
+          triggerConfetti();
+          toast.success("All tests passed! Great job!");
+        } else {
+          toast.error("Tests failed. Check your output!");
+        }
       }
     } else {
       toast.error("Code execution failed!");
     }
+  };
+
+  const handleSubmitCode = async () => {
+    setIsSubmitting(true);
+    setSubmitResult(null);
+    setOutput(null);
+
+    const hiddenTests = currentProblem.hiddenTests?.[selectedLanguage];
+    if (!hiddenTests || !hiddenTests.code) {
+      setSubmitResult({
+        passed: false,
+        message: "No hidden test cases available for this language.",
+      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    // First run visible tests
+    const visibleResult = await executeCode(selectedLanguage, code);
+    if (!visibleResult.success) {
+      setOutput(visibleResult);
+      setSubmitResult({
+        passed: false,
+        message: "Code has errors. Fix them before submitting.",
+      });
+      setIsSubmitting(false);
+      toast.error("Code has errors!");
+      return;
+    }
+
+    const expectedOutput = currentProblem.expectedOutput?.[selectedLanguage];
+    if (expectedOutput && !checkIfTestsPassed(visibleResult.output, expectedOutput)) {
+      setOutput(visibleResult);
+      setSubmitResult({
+        passed: false,
+        message: "Visible test cases failed. Fix them before submitting.",
+      });
+      setIsSubmitting(false);
+      toast.error("Visible test cases failed!");
+      return;
+    }
+
+    // Now run hidden tests - inject hidden test code into user's solution
+    const hiddenCode = code + "\n\n// --- Hidden Test Cases ---\n" + hiddenTests.code;
+    const hiddenResult = await executeCode(selectedLanguage, hiddenCode);
+
+    if (!hiddenResult.success) {
+      setSubmitResult({
+        passed: false,
+        message: "Hidden test cases caused an error.",
+        actual: hiddenResult.error,
+        expected: hiddenTests.expected,
+      });
+      setIsSubmitting(false);
+      toast.error("Hidden test cases failed!");
+      return;
+    }
+
+    const hiddenPassed = checkIfTestsPassed(hiddenResult.output, hiddenTests.expected);
+
+    if (hiddenPassed) {
+      triggerConfetti();
+      setSubmitResult({
+        passed: true,
+        message: "All visible and hidden test cases passed! 🎉",
+      });
+      toast.success("🎉 Solution Accepted! All test cases passed!");
+    } else {
+      setSubmitResult({
+        passed: false,
+        message: "Hidden test cases failed.",
+        expected: hiddenTests.expected,
+        actual: hiddenResult.output,
+      });
+      toast.error("Hidden test cases failed!");
+    }
+
+    setIsSubmitting(false);
   };
 
   return (
@@ -133,9 +211,11 @@ function ProblemPage() {
                   selectedLanguage={selectedLanguage}
                   code={code}
                   isRunning={isRunning}
+                  isSubmitting={isSubmitting}
                   onLanguageChange={handleLanguageChange}
                   onCodeChange={setCode}
                   onRunCode={handleRunCode}
+                  onSubmitCode={handleSubmitCode}
                 />
               </Panel>
 
@@ -144,7 +224,7 @@ function ProblemPage() {
               {/* Bottom panel - Output Panel*/}
 
               <Panel defaultSize={30} minSize={30}>
-                <OutputPanel output={output} />
+                <OutputPanel output={output} submitResult={submitResult} />
               </Panel>
             </PanelGroup>
           </Panel>

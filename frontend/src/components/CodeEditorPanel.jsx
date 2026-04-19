@@ -1,14 +1,17 @@
 import Editor from "@monaco-editor/react";
-import { Loader2Icon, PlayIcon } from "lucide-react";
+import { Loader2Icon, PlayIcon, SendIcon } from "lucide-react";
 import { LANGUAGE_CONFIG } from "../data/problems";
 
 function CodeEditorPanel({
   selectedLanguage,
   code,
   isRunning,
+  isSubmitting,
   onLanguageChange,
   onCodeChange,
   onRunCode,
+  onSubmitCode,
+  readOnly = false,
 }) {
   return (
     <div className="h-full bg-base-300 flex flex-col">
@@ -26,24 +29,45 @@ function CodeEditorPanel({
               </option>
             ))}
           </select>
+          {readOnly && (
+            <span className="badge badge-warning badge-sm">Read Only</span>
+          )}
         </div>
 
-        <button className="btn btn-primary btn-sm gap-2" disabled={isRunning} onClick={onRunCode}>
-          {isRunning ? (
-            <>
-              <Loader2Icon className="size-4 animate-spin" />
-              Running...
-            </>
-          ) : (
-            <>
-              <PlayIcon className="size-4" />
-              Run Code
-            </>
+        <div className="flex items-center gap-2">
+          <button className="btn btn-primary btn-sm gap-2" disabled={isRunning || isSubmitting} onClick={onRunCode}>
+            {isRunning ? (
+              <>
+                <Loader2Icon className="size-4 animate-spin" />
+                Running...
+              </>
+            ) : (
+              <>
+                <PlayIcon className="size-4" />
+                Run Code
+              </>
+            )}
+          </button>
+
+          {onSubmitCode && (
+            <button className="btn btn-success btn-sm gap-2" disabled={isRunning || isSubmitting} onClick={onSubmitCode}>
+              {isSubmitting ? (
+                <>
+                  <Loader2Icon className="size-4 animate-spin" />
+                  Submitting...
+                </>
+              ) : (
+                <>
+                  <SendIcon className="size-4" />
+                  Submit
+                </>
+              )}
+            </button>
           )}
-        </button>
+        </div>
       </div>
 
-      <div className="flex-1 overflow-hidden min-h-0">
+      <div className="flex-1">
         <Editor
           height={"100%"}
           language={LANGUAGE_CONFIG[selectedLanguage].monacoLang}
@@ -56,10 +80,7 @@ function CodeEditorPanel({
             scrollBeyondLastLine: false,
             automaticLayout: true,
             minimap: { enabled: false },
-            scrollbar: {
-              vertical: "visible",
-              horizontal: "visible",
-            },
+            readOnly: readOnly,
           }}
         />
       </div>

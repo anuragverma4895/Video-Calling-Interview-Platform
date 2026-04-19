@@ -1,14 +1,13 @@
-import axiosInstance from "./axios";
+// Piston API code execution - uses backend proxy to avoid CORS issues
 
-// Piston API is a service for code execution
-// Now proxied through backend
+import axiosInstance from "./axios";
 
 const LANGUAGE_VERSIONS = {
   javascript: { language: "javascript", version: "18.15.0" },
   python: { language: "python", version: "3.10.0" },
   java: { language: "java", version: "15.0.2" },
-  "c++": { language: "c++", version: "10.2.0" },
   c: { language: "c", version: "10.2.0" },
+  cpp: { language: "c++", version: "10.2.0" },
 };
 
 /**
@@ -27,7 +26,7 @@ export async function executeCode(language, code) {
       };
     }
 
-    const payload = {
+    const response = await axiosInstance.post("/execute", {
       language: languageConfig.language,
       version: languageConfig.version,
       files: [
@@ -36,9 +35,8 @@ export async function executeCode(language, code) {
           content: code,
         },
       ],
-    };
+    });
 
-    const response = await axiosInstance.post("/execute", payload);
     const data = response.data;
 
     const output = data.run?.output || "";
@@ -57,11 +55,56 @@ export async function executeCode(language, code) {
       output: output || "No output",
     };
   } catch (error) {
+    // If backend proxy fails, try direct Piston API as fallback
+    try {
+      return await executeCodeDirect(language, code);
+    } catch (fallbackError) {
+      return {
+        success: false,
+        error: `Failed to execute code: ${error.message}`,
+      };
+    }
+  }
+}
+
+/**
+ * Direct Piston API call as fallback
+ */
+async function executeCodeDirect(language, code) {
+  const PISTON_API = "https://emkc.org/api/v2/piston";
+  const languageConfig = LANGUAGE_VERSIONS[language];
+
+  const response = await fetch(`${PISTON_API}/execute`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      language: languageConfig.language,
+      version: languageConfig.version,
+      files: [
+        {
+          name: `main.${getFileExtension(language)}`,
+          content: code,
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
     return {
       success: false,
-      error: `Failed to execute code: ${error.message}`,
+      error: `HTTP error! status: ${response.status}`,
     };
   }
+
+  const data = await response.json();
+  const output = data.run?.output || "";
+  const stderr = data.run?.stderr || "";
+
+  if (stderr) {
+    return { success: false, output, error: stderr };
+  }
+
+  return { success: true, output: output || "No output" };
 }
 
 function getFileExtension(language) {
@@ -69,6 +112,8 @@ function getFileExtension(language) {
     javascript: "js",
     python: "py",
     java: "java",
+    c: "c",
+    cpp: "cpp",
   };
 
   return extensions[language] || "txt";

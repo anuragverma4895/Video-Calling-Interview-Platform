@@ -5,7 +5,7 @@ import {
   useCallStateHooks,
 } from "@stream-io/video-react-sdk";
 import { Loader2Icon, MessageSquareIcon, UsersIcon, XIcon } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Channel, Chat, MessageInput, MessageList, Thread, Window } from "stream-chat-react";
 
@@ -18,23 +18,6 @@ function VideoCallUI({ chatClient, channel }) {
   const callingState = useCallCallingState();
   const participantCount = useParticipantCount();
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [unreadMessages, setUnreadMessages] = useState(false);
-
-  useEffect(() => {
-    if (!channel) return;
-
-    const handleNewMessage = (event) => {
-      if (!isChatOpen && event.user.id !== chatClient.userID) {
-        setUnreadMessages(true);
-      }
-    };
-
-    channel.on("message.new", handleNewMessage);
-
-    return () => {
-      channel.off("message.new", handleNewMessage);
-    };
-  }, [channel, isChatOpen, chatClient.userID]);
 
   if (callingState === CallingState.JOINING) {
     return (
@@ -60,18 +43,12 @@ function VideoCallUI({ chatClient, channel }) {
           </div>
           {chatClient && channel && (
             <button
-              onClick={() => {
-                setIsChatOpen(!isChatOpen);
-                if (!isChatOpen) setUnreadMessages(false);
-              }}
-              className={`btn btn-sm gap-2 relative ${isChatOpen ? "btn-primary" : "btn-ghost"}`}
+              onClick={() => setIsChatOpen(!isChatOpen)}
+              className={`btn btn-sm gap-2 ${isChatOpen ? "btn-primary" : "btn-ghost"}`}
               title={isChatOpen ? "Hide chat" : "Show chat"}
             >
               <MessageSquareIcon className="size-4" />
               Chat
-              {unreadMessages && !isChatOpen && (
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border-2 border-base-100"></span>
-              )}
             </button>
           )}
         </div>

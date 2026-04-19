@@ -27,7 +27,7 @@ function HomePage() {
 
             <div className="flex flex-col">
               <span className="font-black text-xl bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent font-mono tracking-wider">
-                Video Calling Interview Platform
+                Talent IQ
               </span>
               <span className="text-xs text-base-content/60 font-medium -mt-1">Code Together</span>
             </div>
@@ -91,10 +91,7 @@ function HomePage() {
                 </button>
               </SignInButton>
 
-              <button 
-                className="btn btn-outline btn-lg"
-                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth" })}
-              >
+              <button className="btn btn-outline btn-lg">
                 <VideoIcon className="size-5" />
                 Watch Demo
               </button>
@@ -127,7 +124,7 @@ function HomePage() {
       </div>
 
       {/* FEATURES SECTION */}
-      <div id="features" className="max-w-7xl mx-auto px-4 py-20">
+      <div className="max-w-7xl mx-auto px-4 py-20">
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold mb-4">
             Everything You Need to <span className="text-primary font-mono">Succeed</span>

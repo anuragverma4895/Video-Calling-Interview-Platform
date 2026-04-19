@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/clerk-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
 import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
@@ -7,7 +7,7 @@ import { executeCode } from "../lib/piston";
 import Navbar from "../components/Navbar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { getDifficultyBadgeClass } from "../lib/utils";
-import { Loader2Icon, LogOutIcon, PhoneOffIcon } from "lucide-react";
+import { Loader2Icon, LogOutIcon, PhoneOffIcon, LockIcon, UnlockIcon } from "lucide-react";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import OutputPanel from "../components/OutputPanel";
 
@@ -15,12 +15,21 @@ import useStreamClient from "../hooks/useStreamClient";
 import { StreamCall, StreamVideo } from "@stream-io/video-react-sdk";
 import VideoCallUI from "../components/VideoCallUI";
 
+import toast from "react-hot-toast";
+import confetti from "canvas-confetti";
+
 function SessionPage() {
   const navigate = useNavigate();
   const { id } = useParams();
   const { user } = useUser();
   const [output, setOutput] = useState(null);
+  const [submitResult, setSubmitResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Access control state
+  const [participantCanEdit, setParticipantCanEdit] = useState(false);
+  const [accessRequested, setAccessRequested] = useState(false);
 
   const { data: sessionData, isLoading: loadingSession, refetch } = useSessionById(id);
 
@@ -46,20 +55,21 @@ function SessionPage() {
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [code, setCode] = useState(problemData?.starterCode?.[selectedLanguage] || "");
 
+  // Ref to avoid broadcasting self-updates
+  const isRemoteUpdate = useRef(false);
+  const syncTimeoutRef = useRef(null);
+
   // auto-join session if user is not already a participant and not the host
   useEffect(() => {
     if (!session || !user || loadingSession) return;
     if (isHost || isParticipant) return;
 
     joinSessionMutation.mutate(id, { onSuccess: refetch });
-
-    // remove the joinSessionMutation, refetch from dependencies to avoid infinite loop
   }, [session, user, loadingSession, isHost, isParticipant, id]);
 
   // redirect the "participant" when session ends
   useEffect(() => {
     if (!session || loadingSession) return;
-
     if (session.status === "completed") navigate("/dashboard");
   }, [session, loadingSession, navigate]);
 
@@ -70,27 +80,264 @@ function SessionPage() {
     }
   }, [problemData, selectedLanguage]);
 
+  // ===== REAL-TIME CODE SYNC via Stream Chat Custom Events =====
+  useEffect(() => {
+    if (!channel) return;
+
+    const handleCustomEvent = (event) => {
+      const { type: eventType } = event;
+
+      if (eventType === "custom" && event.custom_type === "code_sync") {
+        // Someone else changed the code
+        if (event.user?.id !== user?.id) {
+          isRemoteUpdate.current = true;
+          setCode(event.code);
+          if (event.language) setSelectedLanguage(event.language);
+          // Reset after a tick
+          setTimeout(() => { isRemoteUpdate.current = false; }, 50);
+        }
+      }
+
+      if (eventType === "custom" && event.custom_type === "access_grant") {
+        if (event.target_user === user?.id) {
+          setParticipantCanEdit(true);
+          toast.success("Host granted you edit access!");
+        }
+      }
+
+      if (eventType === "custom" && event.custom_type === "access_revoke") {
+        if (event.target_user === user?.id) {
+          setParticipantCanEdit(false);
+          toast("Host revoked your edit access.", { icon: "🔒" });
+        }
+      }
+
+      if (eventType === "custom" && event.custom_type === "access_request") {
+        if (isHost) {
+          toast(
+            (t) => (
+              <div className="flex flex-col gap-2">
+                <p className="font-semibold">{event.requester_name} is requesting edit access</p>
+                <div className="flex gap-2">
+                  <button
+                    className="btn btn-success btn-xs"
+                    onClick={() => {
+                      handleGrantAccess(event.requester_id);
+                      toast.dismiss(t.id);
+                    }}
+                  >
+                    Grant
+                  </button>
+                  <button
+                    className="btn btn-error btn-xs"
+                    onClick={() => toast.dismiss(t.id)}
+                  >
+                    Deny
+                  </button>
+                </div>
+              </div>
+            ),
+            { duration: 15000 }
+          );
+        }
+      }
+    };
+
+    channel.on("custom", handleCustomEvent);
+    return () => channel.off("custom", handleCustomEvent);
+  }, [channel, user, isHost]);
+
+  // Broadcast code changes (debounced)
+  const broadcastCodeChange = useCallback(
+    (newCode) => {
+      if (!channel || isRemoteUpdate.current) return;
+
+      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      syncTimeoutRef.current = setTimeout(async () => {
+        try {
+          await channel.sendEvent({
+            type: "custom",
+            custom_type: "code_sync",
+            code: newCode,
+            language: selectedLanguage,
+          });
+        } catch (err) {
+          // Silently fail - sync is best-effort
+        }
+      }, 300);
+    },
+    [channel, selectedLanguage]
+  );
+
+  const handleCodeChange = (value) => {
+    setCode(value);
+    broadcastCodeChange(value);
+  };
+
+  // Access control functions
+  const handleRequestAccess = async () => {
+    if (!channel) return;
+    try {
+      await channel.sendEvent({
+        type: "custom",
+        custom_type: "access_request",
+        requester_id: user?.id,
+        requester_name: user?.fullName || user?.username || "Participant",
+      });
+      setAccessRequested(true);
+      toast.success("Access request sent to host!");
+    } catch (err) {
+      toast.error("Failed to send request");
+    }
+  };
+
+  const handleGrantAccess = async (targetUserId) => {
+    if (!channel) return;
+    try {
+      await channel.sendEvent({
+        type: "custom",
+        custom_type: "access_grant",
+        target_user: targetUserId,
+      });
+      toast.success("Edit access granted!");
+    } catch (err) {
+      toast.error("Failed to grant access");
+    }
+  };
+
+  const handleRevokeAccess = async () => {
+    if (!channel || !session?.participant) return;
+    try {
+      await channel.sendEvent({
+        type: "custom",
+        custom_type: "access_revoke",
+        target_user: session.participant.clerkId,
+      });
+      toast("Edit access revoked", { icon: "🔒" });
+    } catch (err) {
+      toast.error("Failed to revoke access");
+    }
+  };
+
+  const canEdit = isHost || participantCanEdit;
+
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
     setSelectedLanguage(newLang);
-    // use problem-specific starter code
     const starterCode = problemData?.starterCode?.[newLang] || "";
     setCode(starterCode);
     setOutput(null);
+    setSubmitResult(null);
+
+    // Broadcast language change
+    if (channel && !isRemoteUpdate.current) {
+      channel.sendEvent({
+        type: "custom",
+        custom_type: "code_sync",
+        code: starterCode,
+        language: newLang,
+      }).catch(() => {});
+    }
+  };
+
+  const normalizeOutput = (output) => {
+    return output
+      .trim()
+      .split("\n")
+      .map((line) =>
+        line.trim().replace(/\[\s+/g, "[").replace(/\s+\]/g, "]").replace(/\s*,\s*/g, ",")
+      )
+      .filter((line) => line.length > 0)
+      .join("\n");
+  };
+
+  const checkIfTestsPassed = (actualOutput, expectedOutput) => {
+    return normalizeOutput(actualOutput) === normalizeOutput(expectedOutput);
+  };
+
+  const triggerConfetti = () => {
+    confetti({ particleCount: 80, spread: 250, origin: { x: 0.2, y: 0.6 } });
+    confetti({ particleCount: 80, spread: 250, origin: { x: 0.8, y: 0.6 } });
   };
 
   const handleRunCode = async () => {
     setIsRunning(true);
     setOutput(null);
+    setSubmitResult(null);
 
     const result = await executeCode(selectedLanguage, code);
     setOutput(result);
     setIsRunning(false);
+
+    if (result.success && problemData?.expectedOutput?.[selectedLanguage]) {
+      const testsPassed = checkIfTestsPassed(result.output, problemData.expectedOutput[selectedLanguage]);
+      if (testsPassed) {
+        triggerConfetti();
+        toast.success("All tests passed!");
+      } else {
+        toast.error("Tests failed. Check your output!");
+      }
+    } else if (!result.success) {
+      toast.error("Code execution failed!");
+    }
+  };
+
+  const handleSubmitCode = async () => {
+    setIsSubmitting(true);
+    setSubmitResult(null);
+    setOutput(null);
+
+    const hiddenTests = problemData?.hiddenTests?.[selectedLanguage];
+    if (!hiddenTests || !hiddenTests.code) {
+      setSubmitResult({ passed: false, message: "No hidden test cases available for this language." });
+      setIsSubmitting(false);
+      return;
+    }
+
+    // First run visible tests
+    const visibleResult = await executeCode(selectedLanguage, code);
+    if (!visibleResult.success) {
+      setOutput(visibleResult);
+      setSubmitResult({ passed: false, message: "Code has errors. Fix them before submitting." });
+      setIsSubmitting(false);
+      toast.error("Code has errors!");
+      return;
+    }
+
+    const expectedOutput = problemData?.expectedOutput?.[selectedLanguage];
+    if (expectedOutput && !checkIfTestsPassed(visibleResult.output, expectedOutput)) {
+      setOutput(visibleResult);
+      setSubmitResult({ passed: false, message: "Visible test cases failed. Fix them first." });
+      setIsSubmitting(false);
+      toast.error("Visible test cases failed!");
+      return;
+    }
+
+    // Run hidden tests
+    const hiddenCode = code + "\n\n// --- Hidden Test Cases ---\n" + hiddenTests.code;
+    const hiddenResult = await executeCode(selectedLanguage, hiddenCode);
+
+    if (!hiddenResult.success) {
+      setSubmitResult({ passed: false, message: "Hidden test cases caused an error.", actual: hiddenResult.error, expected: hiddenTests.expected });
+      setIsSubmitting(false);
+      toast.error("Hidden test cases failed!");
+      return;
+    }
+
+    const hiddenPassed = checkIfTestsPassed(hiddenResult.output, hiddenTests.expected);
+    if (hiddenPassed) {
+      triggerConfetti();
+      setSubmitResult({ passed: true, message: "All visible and hidden test cases passed! 🎉" });
+      toast.success("🎉 Solution Accepted!");
+    } else {
+      setSubmitResult({ passed: false, message: "Hidden test cases failed.", expected: hiddenTests.expected, actual: hiddenResult.output });
+      toast.error("Hidden test cases failed!");
+    }
+    setIsSubmitting(false);
   };
 
   const handleEndSession = () => {
     if (confirm("Are you sure you want to end this session? All participants will be notified.")) {
-      // this will navigate the HOST to dashboard
       endSessionMutation.mutate(id, { onSuccess: () => navigate("/dashboard") });
     }
   };
@@ -129,8 +376,8 @@ function SessionPage() {
                             session?.difficulty
                           )}`}
                         >
-                          {session?.difficulty.slice(0, 1).toUpperCase() +
-                            session?.difficulty.slice(1) || "Easy"}
+                          {session?.difficulty?.slice(0, 1).toUpperCase() +
+                            session?.difficulty?.slice(1) || "Easy"}
                         </span>
                         {isHost && session?.status === "active" && (
                           <button
@@ -151,6 +398,38 @@ function SessionPage() {
                         )}
                       </div>
                     </div>
+
+                    {/* Access Control Bar */}
+                    {isHost && session?.participant && (
+                      <div className="flex items-center gap-2 mt-3 p-2 bg-base-200 rounded-lg">
+                        <span className="text-xs text-base-content/60">Participant Edit:</span>
+                        <button
+                          className="btn btn-xs btn-outline gap-1"
+                          onClick={participantCanEdit ? handleRevokeAccess : () => handleGrantAccess(session.participant.clerkId)}
+                        >
+                          {participantCanEdit ? (
+                            <><UnlockIcon className="w-3 h-3" /> Revoke Access</>
+                          ) : (
+                            <><LockIcon className="w-3 h-3" /> Grant Access</>
+                          )}
+                        </button>
+                      </div>
+                    )}
+
+                    {isParticipant && !participantCanEdit && !accessRequested && (
+                      <div className="mt-3 p-2 bg-warning/10 rounded-lg flex items-center justify-between">
+                        <span className="text-xs text-warning">🔒 You are in read-only mode</span>
+                        <button className="btn btn-xs btn-warning" onClick={handleRequestAccess}>
+                          Request Edit Access
+                        </button>
+                      </div>
+                    )}
+
+                    {isParticipant && !participantCanEdit && accessRequested && (
+                      <div className="mt-3 p-2 bg-info/10 rounded-lg">
+                        <span className="text-xs text-info">⏳ Waiting for host to grant access...</span>
+                      </div>
+                    )}
                   </div>
 
                   <div className="p-6 space-y-6">
@@ -236,16 +515,19 @@ function SessionPage() {
                       selectedLanguage={selectedLanguage}
                       code={code}
                       isRunning={isRunning}
+                      isSubmitting={isSubmitting}
                       onLanguageChange={handleLanguageChange}
-                      onCodeChange={(value) => setCode(value)}
+                      onCodeChange={canEdit ? handleCodeChange : undefined}
                       onRunCode={handleRunCode}
+                      onSubmitCode={handleSubmitCode}
+                      readOnly={!canEdit}
                     />
                   </Panel>
 
                   <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors cursor-row-resize" />
 
                   <Panel defaultSize={30} minSize={15}>
-                    <OutputPanel output={output} />
+                    <OutputPanel output={output} submitResult={submitResult} />
                   </Panel>
                 </PanelGroup>
               </Panel>
