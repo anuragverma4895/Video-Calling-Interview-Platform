@@ -72,7 +72,7 @@ function CodeEditorPanel({
           height={"100%"}
           language={LANGUAGE_CONFIG[selectedLanguage].monacoLang}
           value={code}
-          onChange={onCodeChange}
+          onChange={onCodeChange || (() => {})}
           theme="vs-dark"
           options={{
             fontSize: 16,

@@ -1,5 +1,19 @@
+import { useState } from "react";
 import { getDifficultyBadgeClass } from "../lib/utils";
+
 function ProblemDescription({ problem, currentProblemId, onProblemChange, allProblems }) {
+  const [filterDifficulty, setFilterDifficulty] = useState("all");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Sort by order and filter
+  const sortedProblems = [...allProblems]
+    .sort((a, b) => (a.order || 0) - (b.order || 0))
+    .filter((p) => {
+      if (filterDifficulty !== "all" && p.difficulty !== filterDifficulty) return false;
+      if (searchQuery && !p.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+      return true;
+    });
+
   return (
     <div className="h-full overflow-y-auto bg-base-200">
       {/* HEADER SECTION */}
@@ -12,19 +26,39 @@ function ProblemDescription({ problem, currentProblemId, onProblemChange, allPro
         </div>
         <p className="text-base-content/60">{problem.category}</p>
 
-        {/* Problem selector */}
-        <div className="mt-4">
+        {/* Problem selector with search and filter */}
+        <div className="mt-4 space-y-2">
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="Search problems..."
+              className="input input-sm input-bordered flex-1"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+            <select
+              className="select select-sm select-bordered"
+              value={filterDifficulty}
+              onChange={(e) => setFilterDifficulty(e.target.value)}
+            >
+              <option value="all">All</option>
+              <option value="Easy">Easy</option>
+              <option value="Medium">Medium</option>
+              <option value="Hard">Hard</option>
+            </select>
+          </div>
           <select
             className="select select-sm w-full"
             value={currentProblemId}
             onChange={(e) => onProblemChange(e.target.value)}
           >
-            {allProblems.map((p) => (
+            {sortedProblems.map((p) => (
               <option key={p.id} value={p.id}>
-                {p.title} - {p.difficulty}
+                {p.order ? `${p.order}. ` : ""}{p.title} ({p.difficulty})
               </option>
             ))}
           </select>
+          <p className="text-xs text-base-content/40">{sortedProblems.length} problems</p>
         </div>
       </div>
 
@@ -35,7 +69,7 @@ function ProblemDescription({ problem, currentProblemId, onProblemChange, allPro
 
           <div className="space-y-3 text-base leading-relaxed">
             <p className="text-base-content/90">{problem.description.text}</p>
-            {problem.description.notes.map((note, idx) => (
+            {problem.description.notes?.map((note, idx) => (
               <p key={idx} className="text-base-content/90">
                 {note}
               </p>
