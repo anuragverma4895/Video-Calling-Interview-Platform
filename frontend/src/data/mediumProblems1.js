@@ -238,7 +238,7 @@ export const MEDIUM_PROBLEMS_1 = {
       c: `#include <stdio.h>\n\nint main() {\n    // Group anagrams - implement in C\n    printf("Implement groupAnagrams\\n");\n    return 0;\n}`,
       cpp: `#include <iostream>\n#include <vector>\n#include <string>\n#include <unordered_map>\n#include <algorithm>\nusing namespace std;\n\nvector<vector<string>> groupAnagrams(vector<string>& strs) {\n    // Write your solution here\n    return {};\n}\n\nint main() {\n    vector<string> s={"eat","tea","tan","ate","nat","bat"};\n    auto r=groupAnagrams(s);\n    cout<<r.size()<<" groups"<<endl;\n    return 0;\n}`,
     },
-    expectedOutput: { javascript: '[[\"eat\",\"tea\",\"ate\"],[\"tan\",\"nat\"],[\"bat\"]]', python: "[['ate', 'eat', 'tea'], ['bat'], ['nat', 'tan']]", java: "[[eat, tea, ate], [tan, nat], [bat]]", c: "Implement groupAnagrams", cpp: "3 groups" },
+    expectedOutput: { javascript: '[["eat","tea","ate"],["tan","nat"],["bat"]]', python: "[['ate', 'eat', 'tea'], ['bat'], ['nat', 'tan']]", java: "[[eat, tea, ate], [tan, nat], [bat]]", c: "Implement groupAnagrams", cpp: "3 groups" },
     hiddenTests: {
       javascript: { code: `console.log(groupAnagrams([""]).length);`, expected: "1" },
       python: { code: `print(len(groupAnagrams([""])))`, expected: "1" },

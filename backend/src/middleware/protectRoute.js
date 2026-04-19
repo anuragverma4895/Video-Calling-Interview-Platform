@@ -1,5 +1,43 @@
-import { requireAuth } from "@clerk/express";
+import { clerkClient, requireAuth } from "@clerk/express";
 import User from "../models/User.js";
+import { upsertStreamUser } from "../lib/stream.js";
+
+async function provisionUserFromClerk(clerkId) {
+  const clerkUser = await clerkClient.users.getUser(clerkId);
+  const primaryEmail =
+    clerkUser.primaryEmailAddress?.emailAddress ||
+    clerkUser.emailAddresses?.[0]?.emailAddress ||
+    `${clerkId}@clerk.local`;
+  const name =
+    clerkUser.fullName ||
+    [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ").trim() ||
+    clerkUser.username ||
+    primaryEmail.split("@")[0];
+  const profileImage = clerkUser.imageUrl || "";
+
+  const user = await User.findOneAndUpdate(
+    { clerkId },
+    {
+      clerkId,
+      email: primaryEmail,
+      name,
+      profileImage,
+    },
+    {
+      new: true,
+      upsert: true,
+      setDefaultsOnInsert: true,
+    }
+  );
+
+  await upsertStreamUser({
+    id: user.clerkId,
+    name: user.name,
+    image: user.profileImage,
+  });
+
+  return user;
+}
 
 export const protectRoute = [
   requireAuth(),
@@ -7,14 +45,17 @@ export const protectRoute = [
     try {
       const clerkId = req.auth().userId;
 
-      if (!clerkId) return res.status(401).json({ message: "Unauthorized - invalid token" });
+      if (!clerkId) {
+        return res.status(401).json({ message: "Unauthorized - invalid token" });
+      }
 
-      // find user in db by clerk ID
-      const user = await User.findOne({ clerkId });
+      let user = await User.findOne({ clerkId });
 
-      if (!user) return res.status(404).json({ message: "User not found" });
+      // In local development the Clerk webhook/Inngest sync may not have run yet.
+      if (!user) {
+        user = await provisionUserFromClerk(clerkId);
+      }
 
-      // attach user to req
       req.user = user;
 
       next();

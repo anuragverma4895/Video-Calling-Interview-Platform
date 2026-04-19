@@ -39,8 +39,8 @@ export async function executeCode(language, code) {
 
     const data = response.data;
 
-    const output = data.run?.output || "";
-    const stderr = data.run?.stderr || "";
+    const output = data.run?.output || data.run?.stdout || "";
+    const stderr = data.run?.stderr || data.compile?.stderr || data.compile?.output || "";
 
     if (stderr) {
       return {
@@ -61,7 +61,7 @@ export async function executeCode(language, code) {
     } catch (fallbackError) {
       return {
         success: false,
-        error: `Failed to execute code: ${error.message}`,
+        error: `Failed to execute code: ${fallbackError.message || error.message}`,
       };
     }
   }
@@ -97,8 +97,8 @@ async function executeCodeDirect(language, code) {
   }
 
   const data = await response.json();
-  const output = data.run?.output || "";
-  const stderr = data.run?.stderr || "";
+  const output = data.run?.output || data.run?.stdout || "";
+  const stderr = data.run?.stderr || data.compile?.stderr || data.compile?.output || "";
 
   if (stderr) {
     return { success: false, output, error: stderr };

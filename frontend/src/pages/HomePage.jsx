@@ -25,11 +25,11 @@ function HomePage() {
               <SparklesIcon className="size-6 text-white" />
             </div>
 
-            <div className="flex flex-col">
-              <span className="font-black text-xl bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent font-mono tracking-wider">
-                Talent IQ
+            <div className="flex flex-col min-w-0">
+              <span className="max-w-[180px] sm:max-w-[260px] font-black text-sm sm:text-lg leading-tight bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent tracking-tight">
+                Video Calling Interview Platform
               </span>
-              <span className="text-xs text-base-content/60 font-medium -mt-1">Code Together</span>
+              <span className="text-xs text-base-content/60 font-medium">Code Together</span>
             </div>
           </Link>
 

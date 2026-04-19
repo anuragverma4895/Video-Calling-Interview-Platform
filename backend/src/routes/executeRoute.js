@@ -1,30 +1,20 @@
 import express from "express";
+import { executeCode } from "../lib/codeRunner.js";
 
 const router = express.Router();
-
-const PISTON_API = "https://emkc.org/api/v2/piston";
 
 router.post("/", async (req, res) => {
   try {
     const { language, version, files } = req.body;
 
-    const response = await fetch(`${PISTON_API}/execute`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ language, version, files }),
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return res.status(response.status).json({ message: "Error from Piston API", details: data });
+    if (!language || !Array.isArray(files) || files.length === 0) {
+      return res.status(400).json({ message: "Language and files are required" });
     }
 
-    res.status(200).json(data);
+    const result = await executeCode({ language, version, files });
+    res.status(200).json(result);
   } catch (error) {
-    console.error("Error executing code via proxy:", error);
+    console.error("Error executing code:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 });

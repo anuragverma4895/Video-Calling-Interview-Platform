@@ -4,6 +4,11 @@ import { useNavigate, useParams } from "react-router";
 import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../lib/piston";
+import {
+  buildHiddenTestSource,
+  doOutputsMatch,
+  doesOutputEndWithExpected,
+} from "../lib/testExecution";
 import Navbar from "../components/Navbar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { getDifficultyBadgeClass } from "../lib/utils";
@@ -65,7 +70,7 @@ function SessionPage() {
     if (isHost || isParticipant) return;
 
     joinSessionMutation.mutate(id, { onSuccess: refetch });
-  }, [session, user, loadingSession, isHost, isParticipant, id]);
+  }, [session, user, loadingSession, isHost, isParticipant, id, joinSessionMutation, refetch]);
 
   // redirect the "participant" when session ends
   useEffect(() => {
@@ -79,6 +84,14 @@ function SessionPage() {
       setCode(problemData.starterCode[selectedLanguage]);
     }
   }, [problemData, selectedLanguage]);
+
+  useEffect(() => {
+    return () => {
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // ===== REAL-TIME CODE SYNC via Stream Chat Custom Events =====
   useEffect(() => {
@@ -101,6 +114,7 @@ function SessionPage() {
       if (eventType === "custom" && event.custom_type === "access_grant") {
         if (event.target_user === user?.id) {
           setParticipantCanEdit(true);
+          setAccessRequested(false);
           toast.success("Host granted you edit access!");
         }
       }
@@ -145,7 +159,7 @@ function SessionPage() {
 
     channel.on("custom", handleCustomEvent);
     return () => channel.off("custom", handleCustomEvent);
-  }, [channel, user, isHost]);
+  }, [channel, user, isHost, handleGrantAccess]);
 
   // Broadcast code changes (debounced)
   const broadcastCodeChange = useCallback(
@@ -161,7 +175,7 @@ function SessionPage() {
             code: newCode,
             language: selectedLanguage,
           });
-        } catch (err) {
+        } catch {
           // Silently fail - sync is best-effort
         }
       }, 300);
@@ -186,26 +200,30 @@ function SessionPage() {
       });
       setAccessRequested(true);
       toast.success("Access request sent to host!");
-    } catch (err) {
+    } catch {
       toast.error("Failed to send request");
     }
   };
 
-  const handleGrantAccess = async (targetUserId) => {
-    if (!channel) return;
-    try {
-      await channel.sendEvent({
-        type: "custom",
-        custom_type: "access_grant",
-        target_user: targetUserId,
-      });
-      toast.success("Edit access granted!");
-    } catch (err) {
-      toast.error("Failed to grant access");
-    }
-  };
+  const handleGrantAccess = useCallback(
+    async (targetUserId) => {
+      if (!channel) return;
+      try {
+        await channel.sendEvent({
+          type: "custom",
+          custom_type: "access_grant",
+          target_user: targetUserId,
+        });
+        setParticipantCanEdit(true);
+        toast.success("Edit access granted!");
+      } catch {
+        toast.error("Failed to grant access");
+      }
+    },
+    [channel]
+  );
 
-  const handleRevokeAccess = async () => {
+  const handleRevokeAccess = useCallback(async () => {
     if (!channel || !session?.participant) return;
     try {
       await channel.sendEvent({
@@ -214,10 +232,10 @@ function SessionPage() {
         target_user: session.participant.clerkId,
       });
       toast("Edit access revoked", { icon: "🔒" });
-    } catch (err) {
+    } catch {
       toast.error("Failed to revoke access");
     }
-  };
+  }, [channel, session?.participant]);
 
   const canEdit = isHost || participantCanEdit;
 
@@ -240,21 +258,6 @@ function SessionPage() {
     }
   };
 
-  const normalizeOutput = (output) => {
-    return output
-      .trim()
-      .split("\n")
-      .map((line) =>
-        line.trim().replace(/\[\s+/g, "[").replace(/\s+\]/g, "]").replace(/\s*,\s*/g, ",")
-      )
-      .filter((line) => line.length > 0)
-      .join("\n");
-  };
-
-  const checkIfTestsPassed = (actualOutput, expectedOutput) => {
-    return normalizeOutput(actualOutput) === normalizeOutput(expectedOutput);
-  };
-
   const triggerConfetti = () => {
     confetti({ particleCount: 80, spread: 250, origin: { x: 0.2, y: 0.6 } });
     confetti({ particleCount: 80, spread: 250, origin: { x: 0.8, y: 0.6 } });
@@ -270,7 +273,7 @@ function SessionPage() {
     setIsRunning(false);
 
     if (result.success && problemData?.expectedOutput?.[selectedLanguage]) {
-      const testsPassed = checkIfTestsPassed(result.output, problemData.expectedOutput[selectedLanguage]);
+      const testsPassed = doOutputsMatch(result.output, problemData.expectedOutput[selectedLanguage]);
       if (testsPassed) {
         triggerConfetti();
         toast.success("All tests passed!");
@@ -305,7 +308,7 @@ function SessionPage() {
     }
 
     const expectedOutput = problemData?.expectedOutput?.[selectedLanguage];
-    if (expectedOutput && !checkIfTestsPassed(visibleResult.output, expectedOutput)) {
+    if (expectedOutput && !doOutputsMatch(visibleResult.output, expectedOutput)) {
       setOutput(visibleResult);
       setSubmitResult({ passed: false, message: "Visible test cases failed. Fix them first." });
       setIsSubmitting(false);
@@ -314,7 +317,7 @@ function SessionPage() {
     }
 
     // Run hidden tests
-    const hiddenCode = code + "\n\n// --- Hidden Test Cases ---\n" + hiddenTests.code;
+    const hiddenCode = buildHiddenTestSource(selectedLanguage, code, hiddenTests.code);
     const hiddenResult = await executeCode(selectedLanguage, hiddenCode);
 
     if (!hiddenResult.success) {
@@ -324,7 +327,7 @@ function SessionPage() {
       return;
     }
 
-    const hiddenPassed = checkIfTestsPassed(hiddenResult.output, hiddenTests.expected);
+    const hiddenPassed = doesOutputEndWithExpected(hiddenResult.output, hiddenTests.expected);
     if (hiddenPassed) {
       triggerConfetti();
       setSubmitResult({ passed: true, message: "All visible and hidden test cases passed! 🎉" });
@@ -405,7 +408,14 @@ function SessionPage() {
                         <span className="text-xs text-base-content/60">Participant Edit:</span>
                         <button
                           className="btn btn-xs btn-outline gap-1"
-                          onClick={participantCanEdit ? handleRevokeAccess : () => handleGrantAccess(session.participant.clerkId)}
+                          onClick={
+                            participantCanEdit
+                              ? () => {
+                                  setParticipantCanEdit(false);
+                                  handleRevokeAccess();
+                                }
+                              : () => handleGrantAccess(session.participant.clerkId)
+                          }
                         >
                           {participantCanEdit ? (
                             <><UnlockIcon className="w-3 h-3" /> Revoke Access</>

@@ -8,6 +8,11 @@ import ProblemDescription from "../components/ProblemDescription";
 import OutputPanel from "../components/OutputPanel";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import { executeCode } from "../lib/piston";
+import {
+  buildHiddenTestSource,
+  doOutputsMatch,
+  doesOutputEndWithExpected,
+} from "../lib/testExecution";
 
 import toast from "react-hot-toast";
 import confetti from "canvas-confetti";
@@ -60,27 +65,6 @@ function ProblemPage() {
     });
   };
 
-  const normalizeOutput = (output) => {
-    return output
-      .trim()
-      .split("\n")
-      .map((line) =>
-        line
-          .trim()
-          .replace(/\[\s+/g, "[")
-          .replace(/\s+\]/g, "]")
-          .replace(/\s*,\s*/g, ",")
-      )
-      .filter((line) => line.length > 0)
-      .join("\n");
-  };
-
-  const checkIfTestsPassed = (actualOutput, expectedOutput) => {
-    const normalizedActual = normalizeOutput(actualOutput);
-    const normalizedExpected = normalizeOutput(expectedOutput);
-    return normalizedActual == normalizedExpected;
-  };
-
   const handleRunCode = async () => {
     setIsRunning(true);
     setOutput(null);
@@ -93,7 +77,7 @@ function ProblemPage() {
     if (result.success) {
       const expectedOutput = currentProblem.expectedOutput?.[selectedLanguage];
       if (expectedOutput) {
-        const testsPassed = checkIfTestsPassed(result.output, expectedOutput);
+        const testsPassed = doOutputsMatch(result.output, expectedOutput);
         if (testsPassed) {
           triggerConfetti();
           toast.success("All tests passed! Great job!");
@@ -135,7 +119,7 @@ function ProblemPage() {
     }
 
     const expectedOutput = currentProblem.expectedOutput?.[selectedLanguage];
-    if (expectedOutput && !checkIfTestsPassed(visibleResult.output, expectedOutput)) {
+    if (expectedOutput && !doOutputsMatch(visibleResult.output, expectedOutput)) {
       setOutput(visibleResult);
       setSubmitResult({
         passed: false,
@@ -146,8 +130,8 @@ function ProblemPage() {
       return;
     }
 
-    // Now run hidden tests - inject hidden test code into user's solution
-    const hiddenCode = code + "\n\n// --- Hidden Test Cases ---\n" + hiddenTests.code;
+    // Now run hidden tests against the same source with language-aware injection
+    const hiddenCode = buildHiddenTestSource(selectedLanguage, code, hiddenTests.code);
     const hiddenResult = await executeCode(selectedLanguage, hiddenCode);
 
     if (!hiddenResult.success) {
@@ -162,15 +146,15 @@ function ProblemPage() {
       return;
     }
 
-    const hiddenPassed = checkIfTestsPassed(hiddenResult.output, hiddenTests.expected);
+    const hiddenPassed = doesOutputEndWithExpected(hiddenResult.output, hiddenTests.expected);
 
     if (hiddenPassed) {
       triggerConfetti();
       setSubmitResult({
         passed: true,
-        message: "All visible and hidden test cases passed! 🎉",
+        message: "All visible and hidden test cases passed!",
       });
-      toast.success("🎉 Solution Accepted! All test cases passed!");
+      toast.success("Solution accepted! All test cases passed.");
     } else {
       setSubmitResult({
         passed: false,

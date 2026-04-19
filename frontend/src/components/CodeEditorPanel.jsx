@@ -1,6 +1,6 @@
 import Editor from "@monaco-editor/react";
 import { Loader2Icon, PlayIcon, SendIcon } from "lucide-react";
-import { LANGUAGE_CONFIG } from "../data/problems";
+import { LANGUAGE_CONFIG } from "../data/languageConfig";
 
 function CodeEditorPanel({
   selectedLanguage,
@@ -13,6 +13,10 @@ function CodeEditorPanel({
   onSubmitCode,
   readOnly = false,
 }) {
+  const availableLanguages = Object.entries(LANGUAGE_CONFIG).filter(
+    ([, language]) => language.enabled !== false
+  );
+
   return (
     <div className="h-full bg-base-300 flex flex-col">
       <div className="flex items-center justify-between px-4 py-3 bg-base-100 border-t border-base-300">
@@ -23,7 +27,7 @@ function CodeEditorPanel({
             className="size-6"
           />
           <select className="select select-sm" value={selectedLanguage} onChange={onLanguageChange}>
-            {Object.entries(LANGUAGE_CONFIG).map(([key, lang]) => (
+            {availableLanguages.map(([key, lang]) => (
               <option key={key} value={key}>
                 {lang.name}
               </option>
