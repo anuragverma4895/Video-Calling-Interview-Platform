@@ -1,18 +1,15 @@
 import Editor from "@monaco-editor/react";
-import { Loader2Icon, PlayIcon, SendIcon } from "lucide-react";
+import { Loader2Icon, PlayIcon } from "lucide-react";
 import { LANGUAGE_CONFIG } from "../data/languageConfig";
 
 function CodeEditorPanel({
   selectedLanguage,
   code,
   isRunning,
-  isSubmitting,
   onLanguageChange,
   onCodeChange,
   onRunCode,
-  onSubmitCode,
   readOnly = false,
-  submitHint = "",
 }) {
   const availableLanguages = Object.entries(LANGUAGE_CONFIG).filter(
     ([, language]) => language.enabled !== false
@@ -40,7 +37,7 @@ function CodeEditorPanel({
         </div>
 
         <div className="flex items-center gap-2">
-          <button className="btn btn-primary btn-sm gap-2" disabled={isRunning || isSubmitting} onClick={onRunCode}>
+          <button className="btn btn-primary btn-sm gap-2" disabled={isRunning} onClick={onRunCode}>
             {isRunning ? (
               <>
                 <Loader2Icon className="size-4 animate-spin" />
@@ -53,30 +50,8 @@ function CodeEditorPanel({
               </>
             )}
           </button>
-
-          {onSubmitCode && (
-            <button className="btn btn-success btn-sm gap-2" disabled={isRunning || isSubmitting} onClick={onSubmitCode}>
-              {isSubmitting ? (
-                <>
-                  <Loader2Icon className="size-4 animate-spin" />
-                  Submitting...
-                </>
-              ) : (
-                <>
-                  <SendIcon className="size-4" />
-                  Submit
-                </>
-              )}
-            </button>
-          )}
         </div>
       </div>
-
-      {submitHint && (
-        <div className="px-4 py-2 text-xs text-base-content/60 bg-base-200 border-t border-base-300">
-          {submitHint}
-        </div>
-      )}
 
       <div className="flex-1">
         <Editor

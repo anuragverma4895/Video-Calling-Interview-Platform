@@ -4,11 +4,7 @@ import { useNavigate, useParams } from "react-router";
 import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../lib/piston";
-import {
-  buildHiddenTestSource,
-  doOutputsMatch,
-  doesOutputEndWithExpected,
-} from "../lib/testExecution";
+import { doOutputsMatch } from "../lib/testExecution";
 import Navbar from "../components/Navbar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { getDifficultyBadgeClass } from "../lib/utils";
@@ -28,9 +24,7 @@ function SessionPage() {
   const { id } = useParams();
   const { user } = useUser();
   const [output, setOutput] = useState(null);
-  const [submitResult, setSubmitResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Access control state
   const [participantCanEdit, setParticipantCanEdit] = useState(false);
@@ -59,9 +53,6 @@ function SessionPage() {
 
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [code, setCode] = useState(problemData?.starterCode?.[selectedLanguage] || "");
-  const hiddenTests = problemData?.hiddenTests?.[selectedLanguage];
-  const canSubmit =
-    Boolean(hiddenTests?.code?.trim()) && typeof hiddenTests?.expected === "string";
 
   // Ref to avoid broadcasting self-updates
   const isRemoteUpdate = useRef(false);
@@ -248,7 +239,6 @@ function SessionPage() {
     const starterCode = problemData?.starterCode?.[newLang] || "";
     setCode(starterCode);
     setOutput(null);
-    setSubmitResult(null);
 
     // Broadcast language change
     if (channel && !isRemoteUpdate.current) {
@@ -269,7 +259,6 @@ function SessionPage() {
   const handleRunCode = async () => {
     setIsRunning(true);
     setOutput(null);
-    setSubmitResult(null);
 
     const result = await executeCode(selectedLanguage, code);
     setOutput(result);

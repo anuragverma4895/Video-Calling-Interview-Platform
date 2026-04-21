@@ -8,11 +8,7 @@ import ProblemDescription from "../components/ProblemDescription";
 import OutputPanel from "../components/OutputPanel";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import { executeCode } from "../lib/piston";
-import {
-  buildHiddenTestSource,
-  doOutputsMatch,
-  doesOutputEndWithExpected,
-} from "../lib/testExecution";
+import { doOutputsMatch } from "../lib/testExecution";
 
 import toast from "react-hot-toast";
 import confetti from "canvas-confetti";
@@ -25,14 +21,9 @@ function ProblemPage() {
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [code, setCode] = useState(PROBLEMS[currentProblemId]?.starterCode?.javascript || "");
   const [output, setOutput] = useState(null);
-  const [submitResult, setSubmitResult] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const currentProblem = PROBLEMS[currentProblemId];
-  const hiddenTests = currentProblem?.hiddenTests?.[selectedLanguage];
-  const canSubmit =
-    Boolean(hiddenTests?.code?.trim()) && typeof hiddenTests?.expected === "string";
 
   // update problem when URL param changes
   useEffect(() => {
@@ -40,7 +31,6 @@ function ProblemPage() {
       setCurrentProblemId(id);
       setCode(PROBLEMS[id].starterCode?.[selectedLanguage] || "// No starter code available");
       setOutput(null);
-      setSubmitResult(null);
     }
   }, [id, selectedLanguage]);
 
@@ -49,7 +39,6 @@ function ProblemPage() {
     setSelectedLanguage(newLang);
     setCode(currentProblem.starterCode?.[newLang] || "// No starter code available for this language");
     setOutput(null);
-    setSubmitResult(null);
   };
 
   const handleProblemChange = (newProblemId) => navigate(`/problem/${newProblemId}`);
@@ -71,7 +60,6 @@ function ProblemPage() {
   const handleRunCode = async () => {
     setIsRunning(true);
     setOutput(null);
-    setSubmitResult(null);
 
     const result = await executeCode(selectedLanguage, code);
     setOutput(result);
@@ -91,85 +79,6 @@ function ProblemPage() {
     } else {
       toast.error(result.error?.split("\n")[0] || "Code execution failed!");
     }
-  };
-
-  const handleSubmitCode = async () => {
-    setIsSubmitting(true);
-    setSubmitResult(null);
-    setOutput(null);
-
-    if (!hiddenTests || !hiddenTests.code) {
-      setSubmitResult({
-        passed: false,
-        message: "No hidden test cases available for this language.",
-      });
-      setIsSubmitting(false);
-      return;
-    }
-
-    // First run visible tests
-    const visibleResult = await executeCode(selectedLanguage, code);
-    if (!visibleResult.success) {
-      setOutput(visibleResult);
-      setSubmitResult({
-        passed: false,
-        message: "Code has errors. Fix them before submitting.",
-      });
-      setIsSubmitting(false);
-      toast.error("Code has errors!");
-      return;
-    }
-
-    const expectedOutput = currentProblem.expectedOutput?.[selectedLanguage];
-    if (expectedOutput && !doOutputsMatch(visibleResult.output, expectedOutput)) {
-      setOutput(visibleResult);
-      setSubmitResult({
-        passed: false,
-        message: "Visible test cases failed. Fix them before submitting.",
-      });
-      setIsSubmitting(false);
-      toast.error("Visible test cases failed!");
-      return;
-    }
-
-    // Now run hidden tests against the same source with language-aware injection
-    const hiddenCode = buildHiddenTestSource(selectedLanguage, code, hiddenTests.code);
-    const hiddenResult = await executeCode(selectedLanguage, hiddenCode);
-
-    if (!hiddenResult.success) {
-      setOutput(hiddenResult);
-      setSubmitResult({
-        passed: false,
-        message: "Hidden test cases caused an error.",
-        actual: hiddenResult.error,
-        expected: hiddenTests.expected,
-      });
-      setIsSubmitting(false);
-      toast.error("Hidden test cases failed!");
-      return;
-    }
-
-    const hiddenPassed = doesOutputEndWithExpected(hiddenResult.output, hiddenTests.expected);
-
-    if (hiddenPassed) {
-      triggerConfetti();
-      setSubmitResult({
-        passed: true,
-        message: "All visible and hidden test cases passed!",
-      });
-      toast.success("Solution accepted! All test cases passed.");
-    } else {
-      setOutput(hiddenResult);
-      setSubmitResult({
-        passed: false,
-        message: "Hidden test cases failed.",
-        expected: hiddenTests.expected,
-        actual: hiddenResult.output,
-      });
-      toast.error("Hidden test cases failed!");
-    }
-
-    setIsSubmitting(false);
   };
 
   return (
@@ -199,16 +108,9 @@ function ProblemPage() {
                   selectedLanguage={selectedLanguage}
                   code={code}
                   isRunning={isRunning}
-                  isSubmitting={isSubmitting}
                   onLanguageChange={handleLanguageChange}
                   onCodeChange={setCode}
                   onRunCode={handleRunCode}
-                  onSubmitCode={canSubmit ? handleSubmitCode : undefined}
-                  submitHint={
-                    canSubmit
-                      ? ""
-                      : "Submit is hidden for this language because no hidden test cases are configured yet."
-                  }
                 />
               </Panel>
 
@@ -217,7 +119,7 @@ function ProblemPage() {
               {/* Bottom panel - Output Panel*/}
 
               <Panel defaultSize={30} minSize={30}>
-                <OutputPanel output={output} submitResult={submitResult} />
+                <OutputPanel output={output} />
               </Panel>
             </PanelGroup>
           </Panel>
