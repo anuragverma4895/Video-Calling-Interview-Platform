@@ -26,7 +26,6 @@ function SessionPage() {
   const [output, setOutput] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
 
-  // Access control state
   const [participantCanEdit, setParticipantCanEdit] = useState(false);
   const [accessRequested, setAccessRequested] = useState(false);
 
@@ -46,21 +45,20 @@ function SessionPage() {
     isParticipant
   );
 
-  // find the problem data based on session problem title
   const problemData = session?.problem
-    ? Object.values(PROBLEMS).find((p) => p.title === session.problem)
+    ? Object.values(PROBLEMS).find((problem) => problem.title === session.problem)
     : null;
 
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [code, setCode] = useState(problemData?.starterCode?.[selectedLanguage] || "");
 
-  // Ref to avoid broadcasting self-updates
   const isRemoteUpdate = useRef(false);
   const syncTimeoutRef = useRef(null);
 
   const handleGrantAccess = useCallback(
     async (targetUserId) => {
       if (!channel) return;
+
       try {
         await channel.sendEvent({
           type: "custom",
@@ -76,7 +74,6 @@ function SessionPage() {
     [channel]
   );
 
-  // auto-join session if user is not already a participant and not the host
   useEffect(() => {
     if (!session || !user || loadingSession) return;
     if (isHost || isParticipant) return;
@@ -84,13 +81,11 @@ function SessionPage() {
     joinSessionMutation.mutate(id, { onSuccess: refetch });
   }, [session, user, loadingSession, isHost, isParticipant, id, joinSessionMutation, refetch]);
 
-  // redirect the "participant" when session ends
   useEffect(() => {
     if (!session || loadingSession) return;
     if (session.status === "completed") navigate("/dashboard");
   }, [session, loadingSession, navigate]);
 
-  // update code when problem loads or changes
   useEffect(() => {
     if (problemData?.starterCode?.[selectedLanguage]) {
       setCode(problemData.starterCode[selectedLanguage]);
@@ -105,7 +100,6 @@ function SessionPage() {
     };
   }, []);
 
-  // ===== REAL-TIME CODE SYNC via Stream Chat Custom Events =====
   useEffect(() => {
     if (!channel) return;
 
@@ -113,13 +107,13 @@ function SessionPage() {
       const { type: eventType } = event;
 
       if (eventType === "custom" && event.custom_type === "code_sync") {
-        // Someone else changed the code
         if (event.user?.id !== user?.id) {
           isRemoteUpdate.current = true;
           setCode(event.code);
           if (event.language) setSelectedLanguage(event.language);
-          // Reset after a tick
-          setTimeout(() => { isRemoteUpdate.current = false; }, 50);
+          setTimeout(() => {
+            isRemoteUpdate.current = false;
+          }, 50);
         }
       }
 
@@ -134,38 +128,36 @@ function SessionPage() {
       if (eventType === "custom" && event.custom_type === "access_revoke") {
         if (event.target_user === user?.id) {
           setParticipantCanEdit(false);
-          toast("Host revoked your edit access.", { icon: "🔒" });
+          toast("Host revoked your edit access.");
         }
       }
 
-      if (eventType === "custom" && event.custom_type === "access_request") {
-        if (isHost) {
-          toast(
-            (t) => (
-              <div className="flex flex-col gap-2">
-                <p className="font-semibold">{event.requester_name} is requesting edit access</p>
-                <div className="flex gap-2">
-                  <button
-                    className="btn btn-success btn-xs"
-                    onClick={() => {
-                      handleGrantAccess(event.requester_id);
-                      toast.dismiss(t.id);
-                    }}
-                  >
-                    Grant
-                  </button>
-                  <button
-                    className="btn btn-error btn-xs"
-                    onClick={() => toast.dismiss(t.id)}
-                  >
-                    Deny
-                  </button>
-                </div>
+      if (eventType === "custom" && event.custom_type === "access_request" && isHost) {
+        toast(
+          (toastItem) => (
+            <div className="flex flex-col gap-2">
+              <p className="font-semibold">{event.requester_name} is requesting edit access</p>
+              <div className="flex gap-2">
+                <button
+                  className="btn btn-success btn-xs"
+                  onClick={() => {
+                    handleGrantAccess(event.requester_id);
+                    toast.dismiss(toastItem.id);
+                  }}
+                >
+                  Grant
+                </button>
+                <button
+                  className="btn btn-error btn-xs"
+                  onClick={() => toast.dismiss(toastItem.id)}
+                >
+                  Deny
+                </button>
               </div>
-            ),
-            { duration: 15000 }
-          );
-        }
+            </div>
+          ),
+          { duration: 15000 }
+        );
       }
     };
 
@@ -173,12 +165,14 @@ function SessionPage() {
     return () => channel.off("custom", handleCustomEvent);
   }, [channel, user, isHost, handleGrantAccess]);
 
-  // Broadcast code changes (debounced)
   const broadcastCodeChange = useCallback(
     (newCode) => {
       if (!channel || isRemoteUpdate.current) return;
 
-      if (syncTimeoutRef.current) clearTimeout(syncTimeoutRef.current);
+      if (syncTimeoutRef.current) {
+        clearTimeout(syncTimeoutRef.current);
+      }
+
       syncTimeoutRef.current = setTimeout(async () => {
         try {
           await channel.sendEvent({
@@ -188,7 +182,7 @@ function SessionPage() {
             language: selectedLanguage,
           });
         } catch {
-          // Silently fail - sync is best-effort
+          // Sync is best-effort only.
         }
       }, 300);
     },
@@ -200,9 +194,9 @@ function SessionPage() {
     broadcastCodeChange(value);
   };
 
-  // Access control functions
   const handleRequestAccess = async () => {
     if (!channel) return;
+
     try {
       await channel.sendEvent({
         type: "custom",
@@ -219,13 +213,14 @@ function SessionPage() {
 
   const handleRevokeAccess = useCallback(async () => {
     if (!channel || !session?.participant) return;
+
     try {
       await channel.sendEvent({
         type: "custom",
         custom_type: "access_revoke",
         target_user: session.participant.clerkId,
       });
-      toast("Edit access revoked", { icon: "🔒" });
+      toast("Edit access revoked");
     } catch {
       toast.error("Failed to revoke access");
     }
@@ -236,18 +231,20 @@ function SessionPage() {
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
     setSelectedLanguage(newLang);
+
     const starterCode = problemData?.starterCode?.[newLang] || "";
     setCode(starterCode);
     setOutput(null);
 
-    // Broadcast language change
     if (channel && !isRemoteUpdate.current) {
-      channel.sendEvent({
-        type: "custom",
-        custom_type: "code_sync",
-        code: starterCode,
-        language: newLang,
-      }).catch(() => {});
+      channel
+        .sendEvent({
+          type: "custom",
+          custom_type: "code_sync",
+          code: starterCode,
+          language: newLang,
+        })
+        .catch(() => {});
     }
   };
 
@@ -266,6 +263,7 @@ function SessionPage() {
 
     if (result.success && problemData?.expectedOutput?.[selectedLanguage]) {
       const testsPassed = doOutputsMatch(result.output, problemData.expectedOutput[selectedLanguage]);
+
       if (testsPassed) {
         triggerConfetti();
         toast.success("All tests passed!");
@@ -275,61 +273,6 @@ function SessionPage() {
     } else if (!result.success) {
       toast.error(result.error?.split("\n")[0] || "Code execution failed!");
     }
-  };
-
-  const handleSubmitCode = async () => {
-    setIsSubmitting(true);
-    setSubmitResult(null);
-    setOutput(null);
-
-    if (!hiddenTests || !hiddenTests.code) {
-      setSubmitResult({ passed: false, message: "No hidden test cases available for this language." });
-      setIsSubmitting(false);
-      return;
-    }
-
-    // First run visible tests
-    const visibleResult = await executeCode(selectedLanguage, code);
-    if (!visibleResult.success) {
-      setOutput(visibleResult);
-      setSubmitResult({ passed: false, message: "Code has errors. Fix them before submitting." });
-      setIsSubmitting(false);
-      toast.error("Code has errors!");
-      return;
-    }
-
-    const expectedOutput = problemData?.expectedOutput?.[selectedLanguage];
-    if (expectedOutput && !doOutputsMatch(visibleResult.output, expectedOutput)) {
-      setOutput(visibleResult);
-      setSubmitResult({ passed: false, message: "Visible test cases failed. Fix them first." });
-      setIsSubmitting(false);
-      toast.error("Visible test cases failed!");
-      return;
-    }
-
-    // Run hidden tests
-    const hiddenCode = buildHiddenTestSource(selectedLanguage, code, hiddenTests.code);
-    const hiddenResult = await executeCode(selectedLanguage, hiddenCode);
-
-    if (!hiddenResult.success) {
-      setOutput(hiddenResult);
-      setSubmitResult({ passed: false, message: "Hidden test cases caused an error.", actual: hiddenResult.error, expected: hiddenTests.expected });
-      setIsSubmitting(false);
-      toast.error("Hidden test cases failed!");
-      return;
-    }
-
-    const hiddenPassed = doesOutputEndWithExpected(hiddenResult.output, hiddenTests.expected);
-    if (hiddenPassed) {
-      triggerConfetti();
-      setSubmitResult({ passed: true, message: "All visible and hidden test cases passed! 🎉" });
-      toast.success("🎉 Solution Accepted!");
-    } else {
-      setOutput(hiddenResult);
-      setSubmitResult({ passed: false, message: "Hidden test cases failed.", expected: hiddenTests.expected, actual: hiddenResult.output });
-      toast.error("Hidden test cases failed!");
-    }
-    setIsSubmitting(false);
   };
 
   const handleEndSession = () => {
@@ -344,13 +287,10 @@ function SessionPage() {
 
       <div className="flex-1">
         <PanelGroup direction="horizontal">
-          {/* LEFT PANEL - CODE EDITOR & PROBLEM DETAILS */}
           <Panel defaultSize={50} minSize={30}>
             <PanelGroup direction="vertical">
-              {/* PROBLEM DSC PANEL */}
               <Panel defaultSize={50} minSize={20}>
                 <div className="h-full overflow-y-auto bg-base-200">
-                  {/* HEADER SECTION */}
                   <div className="p-6 bg-base-100 border-b border-base-300">
                     <div className="flex items-start justify-between mb-3">
                       <div>
@@ -361,7 +301,7 @@ function SessionPage() {
                           <p className="text-base-content/60 mt-1">{problemData.category}</p>
                         )}
                         <p className="text-base-content/60 mt-2">
-                          Host: {session?.host?.name || "Loading..."} •{" "}
+                          Host: {session?.host?.name || "Loading..."} -{" "}
                           {session?.participant ? 2 : 1}/2 participants
                         </p>
                       </div>
@@ -395,7 +335,6 @@ function SessionPage() {
                       </div>
                     </div>
 
-                    {/* Access Control Bar */}
                     {isHost && session?.participant && (
                       <div className="flex items-center gap-2 mt-3 p-2 bg-base-200 rounded-lg">
                         <span className="text-xs text-base-content/60">Participant Edit:</span>
@@ -411,9 +350,13 @@ function SessionPage() {
                           }
                         >
                           {participantCanEdit ? (
-                            <><UnlockIcon className="w-3 h-3" /> Revoke Access</>
+                            <>
+                              <UnlockIcon className="w-3 h-3" /> Revoke Access
+                            </>
                           ) : (
-                            <><LockIcon className="w-3 h-3" /> Grant Access</>
+                            <>
+                              <LockIcon className="w-3 h-3" /> Grant Access
+                            </>
                           )}
                         </button>
                       </div>
@@ -421,7 +364,7 @@ function SessionPage() {
 
                     {isParticipant && !participantCanEdit && !accessRequested && (
                       <div className="mt-3 p-2 bg-warning/10 rounded-lg flex items-center justify-between">
-                        <span className="text-xs text-warning">🔒 You are in read-only mode</span>
+                        <span className="text-xs text-warning">You are in read-only mode</span>
                         <button className="btn btn-xs btn-warning" onClick={handleRequestAccess}>
                           Request Edit Access
                         </button>
@@ -430,13 +373,14 @@ function SessionPage() {
 
                     {isParticipant && !participantCanEdit && accessRequested && (
                       <div className="mt-3 p-2 bg-info/10 rounded-lg">
-                        <span className="text-xs text-info">⏳ Waiting for host to grant access...</span>
+                        <span className="text-xs text-info">
+                          Waiting for host to grant access...
+                        </span>
                       </div>
                     )}
                   </div>
 
                   <div className="p-6 space-y-6">
-                    {/* problem desc */}
                     {problemData?.description && (
                       <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
                         <h2 className="text-xl font-bold mb-4 text-base-content">Description</h2>
@@ -451,7 +395,6 @@ function SessionPage() {
                       </div>
                     )}
 
-                    {/* examples section */}
                     {problemData?.examples && problemData.examples.length > 0 && (
                       <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
                         <h2 className="text-xl font-bold mb-4 text-base-content">Examples</h2>
@@ -491,14 +434,13 @@ function SessionPage() {
                       </div>
                     )}
 
-                    {/* Constraints */}
                     {problemData?.constraints && problemData.constraints.length > 0 && (
                       <div className="bg-base-100 rounded-xl shadow-sm p-5 border border-base-300">
                         <h2 className="text-xl font-bold mb-4 text-base-content">Constraints</h2>
                         <ul className="space-y-2 text-base-content/90">
                           {problemData.constraints.map((constraint, idx) => (
                             <li key={idx} className="flex gap-2">
-                              <span className="text-primary">•</span>
+                              <span className="text-primary">*</span>
                               <code className="text-sm">{constraint}</code>
                             </li>
                           ))}
@@ -518,24 +460,17 @@ function SessionPage() {
                       selectedLanguage={selectedLanguage}
                       code={code}
                       isRunning={isRunning}
-                      isSubmitting={isSubmitting}
                       onLanguageChange={handleLanguageChange}
                       onCodeChange={canEdit ? handleCodeChange : undefined}
                       onRunCode={handleRunCode}
-                      onSubmitCode={canSubmit ? handleSubmitCode : undefined}
                       readOnly={!canEdit}
-                      submitHint={
-                        canSubmit
-                          ? ""
-                          : "Submit is hidden for this language because no hidden test cases are configured yet."
-                      }
                     />
                   </Panel>
 
                   <PanelResizeHandle className="h-2 bg-base-300 hover:bg-primary transition-colors cursor-row-resize" />
 
                   <Panel defaultSize={30} minSize={15}>
-                    <OutputPanel output={output} submitResult={submitResult} />
+                    <OutputPanel output={output} />
                   </Panel>
                 </PanelGroup>
               </Panel>
@@ -544,7 +479,6 @@ function SessionPage() {
 
           <PanelResizeHandle className="w-2 bg-base-300 hover:bg-primary transition-colors cursor-col-resize" />
 
-          {/* RIGHT PANEL - VIDEO CALLS & CHAT */}
           <Panel defaultSize={50} minSize={30}>
             <div className="h-full bg-base-200 p-4 overflow-auto">
               {isInitializingCall ? (
