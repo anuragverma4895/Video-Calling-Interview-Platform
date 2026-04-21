@@ -59,6 +59,9 @@ function SessionPage() {
 
   const [selectedLanguage, setSelectedLanguage] = useState("javascript");
   const [code, setCode] = useState(problemData?.starterCode?.[selectedLanguage] || "");
+  const hiddenTests = problemData?.hiddenTests?.[selectedLanguage];
+  const canSubmit =
+    Boolean(hiddenTests?.code?.trim()) && typeof hiddenTests?.expected === "string";
 
   // Ref to avoid broadcasting self-updates
   const isRemoteUpdate = useRef(false);
@@ -290,7 +293,6 @@ function SessionPage() {
     setSubmitResult(null);
     setOutput(null);
 
-    const hiddenTests = problemData?.hiddenTests?.[selectedLanguage];
     if (!hiddenTests || !hiddenTests.code) {
       setSubmitResult({ passed: false, message: "No hidden test cases available for this language." });
       setIsSubmitting(false);
@@ -531,8 +533,13 @@ function SessionPage() {
                       onLanguageChange={handleLanguageChange}
                       onCodeChange={canEdit ? handleCodeChange : undefined}
                       onRunCode={handleRunCode}
-                      onSubmitCode={handleSubmitCode}
+                      onSubmitCode={canSubmit ? handleSubmitCode : undefined}
                       readOnly={!canEdit}
+                      submitHint={
+                        canSubmit
+                          ? ""
+                          : "Submit is hidden for this language because no hidden test cases are configured yet."
+                      }
                     />
                   </Panel>
 

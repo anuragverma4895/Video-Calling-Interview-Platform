@@ -12,6 +12,7 @@ function CodeEditorPanel({
   onRunCode,
   onSubmitCode,
   readOnly = false,
+  submitHint = "",
 }) {
   const availableLanguages = Object.entries(LANGUAGE_CONFIG).filter(
     ([, language]) => language.enabled !== false
@@ -70,6 +71,12 @@ function CodeEditorPanel({
           )}
         </div>
       </div>
+
+      {submitHint && (
+        <div className="px-4 py-2 text-xs text-base-content/60 bg-base-200 border-t border-base-300">
+          {submitHint}
+        </div>
+      )}
 
       <div className="flex-1">
         <Editor

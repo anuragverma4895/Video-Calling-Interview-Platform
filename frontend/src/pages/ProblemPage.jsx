@@ -30,6 +30,9 @@ function ProblemPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const currentProblem = PROBLEMS[currentProblemId];
+  const hiddenTests = currentProblem?.hiddenTests?.[selectedLanguage];
+  const canSubmit =
+    Boolean(hiddenTests?.code?.trim()) && typeof hiddenTests?.expected === "string";
 
   // update problem when URL param changes
   useEffect(() => {
@@ -95,7 +98,6 @@ function ProblemPage() {
     setSubmitResult(null);
     setOutput(null);
 
-    const hiddenTests = currentProblem.hiddenTests?.[selectedLanguage];
     if (!hiddenTests || !hiddenTests.code) {
       setSubmitResult({
         passed: false,
@@ -201,7 +203,12 @@ function ProblemPage() {
                   onLanguageChange={handleLanguageChange}
                   onCodeChange={setCode}
                   onRunCode={handleRunCode}
-                  onSubmitCode={handleSubmitCode}
+                  onSubmitCode={canSubmit ? handleSubmitCode : undefined}
+                  submitHint={
+                    canSubmit
+                      ? ""
+                      : "Submit is hidden for this language because no hidden test cases are configured yet."
+                  }
                 />
               </Panel>
 
