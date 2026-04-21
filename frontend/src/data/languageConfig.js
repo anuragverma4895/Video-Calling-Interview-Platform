@@ -22,7 +22,6 @@ export const LANGUAGE_CONFIG = {
     pistonLang: "java",
     pistonVersion: "15.0.2",
     extension: "java",
-    enabled: false,
   },
   c: {
     name: "C",

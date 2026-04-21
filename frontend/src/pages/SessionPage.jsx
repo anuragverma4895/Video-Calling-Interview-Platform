@@ -64,6 +64,24 @@ function SessionPage() {
   const isRemoteUpdate = useRef(false);
   const syncTimeoutRef = useRef(null);
 
+  const handleGrantAccess = useCallback(
+    async (targetUserId) => {
+      if (!channel) return;
+      try {
+        await channel.sendEvent({
+          type: "custom",
+          custom_type: "access_grant",
+          target_user: targetUserId,
+        });
+        setParticipantCanEdit(true);
+        toast.success("Edit access granted!");
+      } catch {
+        toast.error("Failed to grant access");
+      }
+    },
+    [channel]
+  );
+
   // auto-join session if user is not already a participant and not the host
   useEffect(() => {
     if (!session || !user || loadingSession) return;
@@ -205,24 +223,6 @@ function SessionPage() {
     }
   };
 
-  const handleGrantAccess = useCallback(
-    async (targetUserId) => {
-      if (!channel) return;
-      try {
-        await channel.sendEvent({
-          type: "custom",
-          custom_type: "access_grant",
-          target_user: targetUserId,
-        });
-        setParticipantCanEdit(true);
-        toast.success("Edit access granted!");
-      } catch {
-        toast.error("Failed to grant access");
-      }
-    },
-    [channel]
-  );
-
   const handleRevokeAccess = useCallback(async () => {
     if (!channel || !session?.participant) return;
     try {
@@ -321,6 +321,7 @@ function SessionPage() {
     const hiddenResult = await executeCode(selectedLanguage, hiddenCode);
 
     if (!hiddenResult.success) {
+      setOutput(hiddenResult);
       setSubmitResult({ passed: false, message: "Hidden test cases caused an error.", actual: hiddenResult.error, expected: hiddenTests.expected });
       setIsSubmitting(false);
       toast.error("Hidden test cases failed!");
@@ -333,6 +334,7 @@ function SessionPage() {
       setSubmitResult({ passed: true, message: "All visible and hidden test cases passed! 🎉" });
       toast.success("🎉 Solution Accepted!");
     } else {
+      setOutput(hiddenResult);
       setSubmitResult({ passed: false, message: "Hidden test cases failed.", expected: hiddenTests.expected, actual: hiddenResult.output });
       toast.error("Hidden test cases failed!");
     }

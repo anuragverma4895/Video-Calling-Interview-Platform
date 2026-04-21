@@ -135,6 +135,7 @@ function ProblemPage() {
     const hiddenResult = await executeCode(selectedLanguage, hiddenCode);
 
     if (!hiddenResult.success) {
+      setOutput(hiddenResult);
       setSubmitResult({
         passed: false,
         message: "Hidden test cases caused an error.",
@@ -156,6 +157,7 @@ function ProblemPage() {
       });
       toast.success("Solution accepted! All test cases passed.");
     } else {
+      setOutput(hiddenResult);
       setSubmitResult({
         passed: false,
         message: "Hidden test cases failed.",
