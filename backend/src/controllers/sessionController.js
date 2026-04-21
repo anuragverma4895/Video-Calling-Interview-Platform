@@ -3,6 +3,10 @@ import Session from "../models/Session.js";
 
 export async function createSession(req, res) {
   try {
+    if (!chatClient || !streamClient) {
+      return res.status(503).json({ message: "Video session services are not configured on this server." });
+    }
+
     const { problem, difficulty } = req.body;
     const userId = req.user._id;
     const clerkId = req.user.clerkId;
@@ -94,6 +98,10 @@ export async function getSessionById(req, res) {
 
 export async function joinSession(req, res) {
   try {
+    if (!chatClient) {
+      return res.status(503).json({ message: "Chat service is not configured on this server." });
+    }
+
     const { id } = req.params;
     const userId = req.user._id;
     const clerkId = req.user.clerkId;
@@ -128,6 +136,10 @@ export async function joinSession(req, res) {
 
 export async function endSession(req, res) {
   try {
+    if (!chatClient || !streamClient) {
+      return res.status(503).json({ message: "Video session services are not configured on this server." });
+    }
+
     const { id } = req.params;
     const userId = req.user._id;
 

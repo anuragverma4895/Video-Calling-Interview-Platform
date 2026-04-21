@@ -281,7 +281,7 @@ function SessionPage() {
         toast.error("Tests failed. Check your output!");
       }
     } else if (!result.success) {
-      toast.error("Code execution failed!");
+      toast.error(result.error?.split("\n")[0] || "Code execution failed!");
     }
   };
 

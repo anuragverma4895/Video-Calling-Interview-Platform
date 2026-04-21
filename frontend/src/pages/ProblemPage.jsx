@@ -86,7 +86,7 @@ function ProblemPage() {
         }
       }
     } else {
-      toast.error("Code execution failed!");
+      toast.error(result.error?.split("\n")[0] || "Code execution failed!");
     }
   };
 

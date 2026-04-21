@@ -15,15 +15,12 @@ import executeRoute from "./routes/executeRoute.js";
 
 const app = express();
 
-// Get the actual directory of this file (works regardless of CWD)
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// middleware
 app.use(express.json());
-// credentials:true meaning?? => server allows a browser to include cookies on request
 app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
-app.use(clerkMiddleware()); // this adds auth field to request object: req.auth()
+app.use(clerkMiddleware());
 
 app.use("/api/inngest", serve({ client: inngest, functions }));
 app.use("/api/chat", chatRoutes);
@@ -34,7 +31,6 @@ app.get("/health", (req, res) => {
   res.status(200).json({ msg: "api is up and running" });
 });
 
-// make our app ready for deployment
 if (ENV.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../../frontend/dist")));
 
@@ -44,12 +40,30 @@ if (ENV.NODE_ENV === "production") {
 }
 
 const startServer = async () => {
+  let databaseConnected = false;
+
   try {
     await connectDB();
-    app.listen(ENV.PORT, () => console.log("Server is running on port:", ENV.PORT));
+    databaseConnected = true;
   } catch (error) {
-    console.error("💥 Error starting the server", error);
+    const isProduction = ENV.NODE_ENV === "production";
+    console.error("Database connection failed:", error.message || error);
+
+    if (isProduction) {
+      process.exit(1);
+    }
+
+    console.warn(
+      "Starting backend without MongoDB. Session and chat features may fail, but code execution remains available."
+    );
   }
+
+  const port = ENV.PORT || 3000;
+  app.listen(port, () =>
+    console.log(
+      `Server is running on port: ${port}${databaseConnected ? "" : " (without MongoDB)"}`
+    )
+  );
 };
 
 startServer();
