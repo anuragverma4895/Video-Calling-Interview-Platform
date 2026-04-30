@@ -105,10 +105,11 @@ function AdminPage() {
           <div className="card bg-base-100 shadow-xl border border-primary/20">
             <div className="card-body items-center text-center py-16">
               <ShieldCheckIcon className="size-12 text-primary" />
-              <h2 className="text-2xl font-bold mt-4">Normal login pehle, admin check baad me</h2>
+              <h2 className="text-2xl font-bold mt-4">Sign in first, then admin access is verified</h2>
               <p className="text-base-content/65 max-w-xl">
-                `/admin` kisi ko admin nahi banata. Pehle normal Clerk login hota hai, uske baad
-                backend `ADMIN_EMAILS` ya `ADMIN_CLERK_IDS` se check karta hai ki admin kaun hai.
+                Signing in here does not make anyone an admin. After login, the backend checks
+                `ADMIN_EMAILS` and `ADMIN_CLERK_IDS` to decide whether this account can open the
+                admin panel.
               </p>
               <div className="flex flex-wrap items-center justify-center gap-3 mt-4">
                 <SignInButton mode="modal">
