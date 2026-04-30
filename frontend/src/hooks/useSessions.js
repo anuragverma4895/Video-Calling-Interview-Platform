@@ -1,12 +1,17 @@
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { sessionApi } from "../api/sessions";
 
 export const useCreateSession = () => {
+  const queryClient = useQueryClient();
+
   const result = useMutation({
     mutationKey: ["createSession"],
     mutationFn: sessionApi.createSession,
-    onSuccess: () => toast.success("Session created successfully!"),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
+      toast.success("Session created successfully!");
+    },
     onError: (error) => toast.error(error.response?.data?.message || "Failed to create room"),
   });
 
@@ -43,10 +48,16 @@ export const useSessionById = (id) => {
 };
 
 export const useJoinSession = () => {
+  const queryClient = useQueryClient();
+
   const result = useMutation({
     mutationKey: ["joinSession"],
     mutationFn: sessionApi.joinSession,
-    onSuccess: () => toast.success("Joined session successfully!"),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["session", id] });
+      toast.success("Joined session successfully!");
+    },
     onError: (error) => toast.error(error.response?.data?.message || "Failed to join session"),
   });
 
@@ -54,11 +65,111 @@ export const useJoinSession = () => {
 };
 
 export const useEndSession = () => {
+  const queryClient = useQueryClient();
+
   const result = useMutation({
     mutationKey: ["endSession"],
     mutationFn: sessionApi.endSession,
-    onSuccess: () => toast.success("Session ended successfully!"),
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["myRecentSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["session", id] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+      toast.success("Session ended successfully!");
+    },
     onError: (error) => toast.error(error.response?.data?.message || "Failed to end session"),
+  });
+
+  return result;
+};
+
+export const useLeaveSession = () => {
+  const queryClient = useQueryClient();
+
+  const result = useMutation({
+    mutationKey: ["leaveSession"],
+    mutationFn: sessionApi.leaveSession,
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["myRecentSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["session", id] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+    },
+  });
+
+  return result;
+};
+
+export const useAdminAccess = () => {
+  const result = useQuery({
+    queryKey: ["adminAccess"],
+    queryFn: sessionApi.getAdminAccess,
+    retry: false,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  return result;
+};
+
+export const useAdminOverview = () => {
+  const result = useQuery({
+    queryKey: ["adminOverview"],
+    queryFn: sessionApi.getAdminOverview,
+    retry: false,
+  });
+
+  return result;
+};
+
+export const useAdminEndSession = () => {
+  const queryClient = useQueryClient();
+
+  const result = useMutation({
+    mutationKey: ["adminEndSession"],
+    mutationFn: sessionApi.adminEndSession,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["myRecentSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+      toast.success("Session closed by admin");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || "Failed to close session"),
+  });
+
+  return result;
+};
+
+export const useAdminDeleteSession = () => {
+  const queryClient = useQueryClient();
+
+  const result = useMutation({
+    mutationKey: ["adminDeleteSession"],
+    mutationFn: sessionApi.deleteSessionAsAdmin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["myRecentSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+      toast.success("Session deleted successfully");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || "Failed to delete session"),
+  });
+
+  return result;
+};
+
+export const useAdminDeleteUser = () => {
+  const queryClient = useQueryClient();
+
+  const result = useMutation({
+    mutationKey: ["adminDeleteUser"],
+    mutationFn: sessionApi.deleteUserAsAdmin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["myRecentSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+      toast.success("User deleted successfully");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || "Failed to delete user"),
   });
 
   return result;

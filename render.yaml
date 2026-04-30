@@ -13,6 +13,10 @@ services:
         scope: all
       - key: CLIENT_URL
         scope: all
+      - key: ADMIN_EMAILS
+        scope: all
+      - key: ADMIN_CLERK_IDS
+        scope: all
       - key: PISTON_API_URL
         scope: all
       - key: VITE_PISTON_API_URL

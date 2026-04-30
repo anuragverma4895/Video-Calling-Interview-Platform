@@ -1,11 +1,14 @@
 import { Link, useLocation } from "react-router";
-import { BookOpenIcon, LayoutDashboardIcon, Code2Icon } from "lucide-react";
+import { BookOpenIcon, LayoutDashboardIcon, Code2Icon, ShieldCheckIcon } from "lucide-react";
 import { UserButton } from "@clerk/clerk-react";
+import { useAdminAccess } from "../hooks/useSessions";
 
 function Navbar() {
   const location = useLocation();
+  const { data: adminAccessData, isSuccess: hasAdminAccess } = useAdminAccess();
 
   const isActive = (path) => location.pathname === path;
+  const isAdmin = hasAdminAccess && adminAccessData?.isAdmin;
 
   return (
     <nav className="bg-base-100/80 backdrop-blur-md border-b border-primary/20 sticky top-0 z-50 shadow-lg">
@@ -63,6 +66,24 @@ function Navbar() {
               <span className="font-medium hidden sm:inline">Dashboard</span>
             </div>
           </Link>
+
+          {isAdmin && (
+            <Link
+              to={"/admin"}
+              className={`px-4 py-2.5 rounded-lg transition-all duration-200 
+                ${
+                  isActive("/admin")
+                    ? "bg-primary text-primary-content"
+                    : "hover:bg-base-200 text-base-content/70 hover:text-base-content"
+                }
+              `}
+            >
+              <div className="flex items-center gap-x-2.5">
+                <ShieldCheckIcon className="size-4" />
+                <span className="font-medium hidden sm:inline">Admin</span>
+              </div>
+            </Link>
+          )}
 
           <div className="ml-4 mt-2">
             <UserButton />

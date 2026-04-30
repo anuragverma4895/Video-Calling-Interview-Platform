@@ -1,6 +1,34 @@
 import { chatClient, streamClient } from "../lib/stream.js";
 import Session from "../models/Session.js";
 
+export async function cleanupSessionResources(session) {
+  if (!session?.callId || !chatClient || !streamClient) {
+    return;
+  }
+
+  try {
+    const call = streamClient.video.call("default", session.callId);
+    await call.delete({ hard: true });
+  } catch (error) {
+    console.log("Failed to delete stream call:", error.message);
+  }
+
+  try {
+    const channel = chatClient.channel("messaging", session.callId);
+    await channel.delete();
+  } catch (error) {
+    console.log("Failed to delete chat channel:", error.message);
+  }
+}
+
+export async function completeSession(session) {
+  await cleanupSessionResources(session);
+  session.status = "completed";
+  session.participant = null;
+  await session.save();
+  return session;
+}
+
 export async function createSession(req, res) {
   try {
     if (!chatClient || !streamClient) {
@@ -157,20 +185,57 @@ export async function endSession(req, res) {
       return res.status(400).json({ message: "Session is already completed" });
     }
 
-    // delete stream video call
-    const call = streamClient.video.call("default", session.callId);
-    await call.delete({ hard: true });
-
-    // delete stream chat channel
-    const channel = chatClient.channel("messaging", session.callId);
-    await channel.delete();
-
-    session.status = "completed";
-    await session.save();
+    await completeSession(session);
 
     res.status(200).json({ session, message: "Session ended successfully" });
   } catch (error) {
     console.log("Error in endSession controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function leaveSession(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id.toString();
+
+    const session = await Session.findById(id)
+      .populate("host", "name email profileImage clerkId")
+      .populate("participant", "name email profileImage clerkId");
+
+    if (!session) return res.status(404).json({ message: "Session not found" });
+
+    if (session.status === "completed") {
+      return res.status(200).json({ session, message: "Session already completed" });
+    }
+
+    if (session.host?._id.toString() === userId) {
+      await completeSession(session);
+      return res.status(200).json({
+        session,
+        message: "Host left the session, so the session was closed",
+        closed: true,
+      });
+    }
+
+    if (session.participant?._id.toString() === userId) {
+      session.participant = null;
+      await session.save();
+
+      const refreshedSession = await Session.findById(id)
+        .populate("host", "name email profileImage clerkId")
+        .populate("participant", "name email profileImage clerkId");
+
+      return res.status(200).json({
+        session: refreshedSession,
+        message: "You left the session",
+        closed: false,
+      });
+    }
+
+    return res.status(403).json({ message: "You are not part of this session" });
+  } catch (error) {
+    console.log("Error in leaveSession controller:", error.message);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }

@@ -1,7 +1,7 @@
 import { useUser } from "@clerk/clerk-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
-import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
+import { useEndSession, useJoinSession, useLeaveSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../lib/piston";
 import { doOutputsMatch } from "../lib/testExecution";
@@ -15,6 +15,7 @@ import OutputPanel from "../components/OutputPanel";
 import useStreamClient from "../hooks/useStreamClient";
 import { StreamCall, StreamVideo } from "@stream-io/video-react-sdk";
 import VideoCallUI from "../components/VideoCallUI";
+import { sessionApi } from "../api/sessions";
 
 import toast from "react-hot-toast";
 import confetti from "canvas-confetti";
@@ -33,10 +34,13 @@ function SessionPage() {
 
   const joinSessionMutation = useJoinSession();
   const endSessionMutation = useEndSession();
+  const leaveSessionMutation = useLeaveSession();
 
   const session = sessionData?.session;
   const isHost = session?.host?.clerkId === user?.id;
   const isParticipant = session?.participant?.clerkId === user?.id;
+  const hasInitiatedExitRef = useRef(false);
+  const hasClosedSessionRef = useRef(false);
 
   const { call, channel, chatClient, isInitializingCall, streamClient } = useStreamClient(
     session,
@@ -83,7 +87,10 @@ function SessionPage() {
 
   useEffect(() => {
     if (!session || loadingSession) return;
-    if (session.status === "completed") navigate("/dashboard");
+    if (session.status === "completed") {
+      hasClosedSessionRef.current = true;
+      navigate("/dashboard");
+    }
   }, [session, loadingSession, navigate]);
 
   useEffect(() => {
@@ -164,6 +171,36 @@ function SessionPage() {
     channel.on("custom", handleCustomEvent);
     return () => channel.off("custom", handleCustomEvent);
   }, [channel, user, isHost, handleGrantAccess]);
+
+  useEffect(() => {
+    if (!id || !session || loadingSession) return;
+    if (!isHost && !isParticipant) return;
+
+    const leaveSilently = () => {
+      if (hasInitiatedExitRef.current || hasClosedSessionRef.current) return;
+      hasInitiatedExitRef.current = true;
+      sessionApi.leaveSession(id).catch(() => {});
+    };
+
+    const handlePageHide = () => {
+      if (hasInitiatedExitRef.current || hasClosedSessionRef.current) return;
+      hasInitiatedExitRef.current = true;
+
+      if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
+        navigator.sendBeacon(`/api/sessions/${id}/leave`);
+        return;
+      }
+
+      leaveSilently();
+    };
+
+    window.addEventListener("pagehide", handlePageHide);
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      leaveSilently();
+    };
+  }, [id, isHost, isParticipant, loadingSession, session]);
 
   const broadcastCodeChange = useCallback(
     (newCode) => {
@@ -277,6 +314,8 @@ function SessionPage() {
 
   const handleEndSession = () => {
     if (confirm("Are you sure you want to end this session? All participants will be notified.")) {
+      hasInitiatedExitRef.current = true;
+      hasClosedSessionRef.current = true;
       endSessionMutation.mutate(id, { onSuccess: () => navigate("/dashboard") });
     }
   };

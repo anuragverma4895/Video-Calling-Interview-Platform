@@ -24,12 +24,36 @@ export const sessionApi = {
     const response = await axiosInstance.post(`/sessions/${id}/join`);
     return response.data;
   },
+  leaveSession: async (id) => {
+    const response = await axiosInstance.post(`/sessions/${id}/leave`);
+    return response.data;
+  },
   endSession: async (id) => {
     const response = await axiosInstance.post(`/sessions/${id}/end`);
     return response.data;
   },
   getStreamToken: async () => {
     const response = await axiosInstance.get(`/chat/token`);
+    return response.data;
+  },
+  getAdminAccess: async () => {
+    const response = await axiosInstance.get("/admin/access");
+    return response.data;
+  },
+  getAdminOverview: async () => {
+    const response = await axiosInstance.get("/admin/overview");
+    return response.data;
+  },
+  adminEndSession: async (id) => {
+    const response = await axiosInstance.post(`/admin/sessions/${id}/end`);
+    return response.data;
+  },
+  deleteSessionAsAdmin: async (id) => {
+    const response = await axiosInstance.delete(`/admin/sessions/${id}`);
+    return response.data;
+  },
+  deleteUserAsAdmin: async (id) => {
+    const response = await axiosInstance.delete(`/admin/users/${id}`);
     return response.data;
   },
 };
