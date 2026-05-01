@@ -39,6 +39,7 @@ function SessionPage() {
   const isParticipant = session?.participant?.clerkId === user?.id;
   const hasInitiatedExitRef = useRef(false);
   const hasClosedSessionRef = useRef(false);
+  const hasAttemptedJoinRef = useRef(false);
   const isHostExitBlocked =
     isHost && session?.status === "active" && !hasClosedSessionRef.current;
 
@@ -83,24 +84,30 @@ function SessionPage() {
   useEffect(() => {
     if (!session || !user || loadingSession) return;
     if (isHost || isParticipant) return;
+    if (hasAttemptedJoinRef.current) return;
 
+    hasAttemptedJoinRef.current = true;
     joinSessionMutation.mutate(id, { onSuccess: refetch });
-  }, [session, user, loadingSession, isHost, isParticipant, id, joinSessionMutation, refetch]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session, user, loadingSession, isHost, isParticipant, id]);
+
+  const sessionStatus = session?.status;
 
   useEffect(() => {
-    if (!session || loadingSession) return;
-    if (session.status === "completed") {
+    if (!sessionStatus || loadingSession) return;
+    if (sessionStatus === "completed") {
       hasClosedSessionRef.current = true;
       navigate("/dashboard");
     }
-  }, [session, loadingSession, navigate]);
+  }, [sessionStatus, loadingSession, navigate]);
 
   useEffect(() => {
     if (blocker.state !== "blocked") return;
 
     toast.error("Session chhodne se pehle host ko session end karna hoga.");
     blocker.reset();
-  }, [blocker]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [blocker.state]);
 
   useEffect(() => {
     if (!isHostExitBlocked) return;
@@ -193,18 +200,26 @@ function SessionPage() {
     return () => channel.off("custom", handleCustomEvent);
   }, [channel, user, isHost, handleGrantAccess]);
 
+  // Store isHost/isParticipant in refs so the cleanup function always has latest values
+  // without adding them to the dep array (which would cause premature cleanup)
+  const isHostRef = useRef(isHost);
+  const isParticipantRef = useRef(isParticipant);
+  useEffect(() => { isHostRef.current = isHost; }, [isHost]);
+  useEffect(() => { isParticipantRef.current = isParticipant; }, [isParticipant]);
+
   useEffect(() => {
-    if (!id || !session || loadingSession) return;
-    if (!isHost && !isParticipant) return;
+    if (!id) return;
 
     const leaveSilently = () => {
       if (hasInitiatedExitRef.current || hasClosedSessionRef.current) return;
+      if (!isHostRef.current && !isParticipantRef.current) return;
       hasInitiatedExitRef.current = true;
       sessionApi.leaveSession(id).catch(() => {});
     };
 
     const handlePageHide = () => {
       if (hasInitiatedExitRef.current || hasClosedSessionRef.current) return;
+      if (!isHostRef.current && !isParticipantRef.current) return;
       hasInitiatedExitRef.current = true;
 
       if (typeof navigator !== "undefined" && typeof navigator.sendBeacon === "function") {
@@ -221,7 +236,7 @@ function SessionPage() {
       window.removeEventListener("pagehide", handlePageHide);
       leaveSilently();
     };
-  }, [id, isHost, isParticipant, loadingSession, session]);
+  }, [id]);
 
   const broadcastCodeChange = useCallback(
     (newCode) => {
