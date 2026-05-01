@@ -1,7 +1,7 @@
 import { useUser } from "@clerk/clerk-react";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useNavigate, useParams } from "react-router";
-import { useEndSession, useJoinSession, useLeaveSession, useSessionById } from "../hooks/useSessions";
+import { useBlocker, useNavigate, useParams } from "react-router";
+import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../lib/piston";
 import { doOutputsMatch } from "../lib/testExecution";
@@ -34,13 +34,15 @@ function SessionPage() {
 
   const joinSessionMutation = useJoinSession();
   const endSessionMutation = useEndSession();
-  const leaveSessionMutation = useLeaveSession();
-
   const session = sessionData?.session;
   const isHost = session?.host?.clerkId === user?.id;
   const isParticipant = session?.participant?.clerkId === user?.id;
   const hasInitiatedExitRef = useRef(false);
   const hasClosedSessionRef = useRef(false);
+  const isHostExitBlocked =
+    isHost && session?.status === "active" && !hasClosedSessionRef.current;
+
+  const blocker = useBlocker(isHostExitBlocked);
 
   const { call, channel, chatClient, isInitializingCall, streamClient } = useStreamClient(
     session,
@@ -92,6 +94,25 @@ function SessionPage() {
       navigate("/dashboard");
     }
   }, [session, loadingSession, navigate]);
+
+  useEffect(() => {
+    if (blocker.state !== "blocked") return;
+
+    toast.error("Session chhodne se pehle host ko session end karna hoga.");
+    blocker.reset();
+  }, [blocker]);
+
+  useEffect(() => {
+    if (!isHostExitBlocked) return;
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [isHostExitBlocked]);
 
   useEffect(() => {
     if (problemData?.starterCode?.[selectedLanguage]) {
@@ -320,6 +341,10 @@ function SessionPage() {
     }
   };
 
+  const handleBlockedExitAttempt = useCallback(() => {
+    toast.error("Pehle session end kijiye, uske baad hi aap bahar aa sakte hain.");
+  }, []);
+
   return (
     <div className="h-screen bg-base-100 flex flex-col">
       <Navbar />
@@ -543,7 +568,12 @@ function SessionPage() {
                 <div className="h-full">
                   <StreamVideo client={streamClient}>
                     <StreamCall call={call}>
-                      <VideoCallUI chatClient={chatClient} channel={channel} />
+                      <VideoCallUI
+                        chatClient={chatClient}
+                        channel={channel}
+                        isHost={isHost}
+                        onBlockedExitAttempt={handleBlockedExitAttempt}
+                      />
                     </StreamCall>
                   </StreamVideo>
                 </div>

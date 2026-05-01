@@ -1,10 +1,15 @@
 import {
   CallControls,
   CallingState,
+  ReactionsButton,
+  RecordCallButton,
+  ScreenShareButton,
   SpeakerLayout,
+  ToggleAudioPublishingButton,
+  ToggleVideoPublishingButton,
   useCallStateHooks,
 } from "@stream-io/video-react-sdk";
-import { Loader2Icon, MessageSquareIcon, UsersIcon, XIcon } from "lucide-react";
+import { Loader2Icon, MessageSquareIcon, PhoneOffIcon, UsersIcon, XIcon } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { Channel, Chat, MessageInput, MessageList, Thread, Window } from "stream-chat-react";
@@ -12,7 +17,7 @@ import { Channel, Chat, MessageInput, MessageList, Thread, Window } from "stream
 import "@stream-io/video-react-sdk/dist/css/styles.css";
 import "stream-chat-react/dist/css/v2/index.css";
 
-function VideoCallUI({ chatClient, channel }) {
+function VideoCallUI({ chatClient, channel, isHost = false, onBlockedExitAttempt }) {
   const navigate = useNavigate();
   const { useCallCallingState, useParticipantCount } = useCallStateHooks();
   const callingState = useCallCallingState();
@@ -58,7 +63,21 @@ function VideoCallUI({ chatClient, channel }) {
         </div>
 
         <div className="bg-base-100 p-3 rounded-lg shadow flex justify-center">
-          <CallControls onLeave={() => navigate("/dashboard")} />
+          {isHost ? (
+            <div className="flex items-center justify-center gap-3 flex-wrap">
+              <ToggleAudioPublishingButton />
+              <ToggleVideoPublishingButton />
+              <ReactionsButton />
+              <ScreenShareButton />
+              <RecordCallButton />
+              <button className="btn btn-error gap-2" onClick={onBlockedExitAttempt}>
+                <PhoneOffIcon className="size-4" />
+                End Session First
+              </button>
+            </div>
+          ) : (
+            <CallControls onLeave={() => navigate("/dashboard")} />
+          )}
         </div>
       </div>
 
