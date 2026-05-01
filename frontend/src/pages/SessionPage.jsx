@@ -1,6 +1,6 @@
 import { useUser } from "@clerk/clerk-react";
 import { useEffect, useState, useCallback, useRef } from "react";
-import { useBlocker, useNavigate, useParams } from "react-router";
+import { useNavigate, useParams } from "react-router";
 import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../lib/piston";
@@ -42,8 +42,6 @@ function SessionPage() {
   const hasAttemptedJoinRef = useRef(false);
   const isHostExitBlocked =
     isHost && session?.status === "active" && !hasClosedSessionRef.current;
-
-  const blocker = useBlocker(isHostExitBlocked);
 
   const { call, channel, chatClient, isInitializingCall, streamClient } = useStreamClient(
     session,
@@ -101,13 +99,6 @@ function SessionPage() {
     }
   }, [sessionStatus, loadingSession, navigate]);
 
-  useEffect(() => {
-    if (blocker.state !== "blocked") return;
-
-    toast.error("Session chhodne se pehle host ko session end karna hoga.");
-    blocker.reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [blocker.state]);
 
   useEffect(() => {
     if (!isHostExitBlocked) return;
