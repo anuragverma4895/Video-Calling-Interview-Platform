@@ -26,8 +26,8 @@ function AdminPage() {
   const adminDeleteSessionMutation = useAdminDeleteSession();
   const adminDeleteUserMutation = useAdminDeleteUser();
 
-  const sessions = data?.sessions || [];
-  const users = data?.users || [];
+  const sessions = useMemo(() => data?.sessions || [], [data?.sessions]);
+  const users = useMemo(() => data?.users || [], [data?.users]);
   const stats = data?.stats;
 
   const activeSessions = useMemo(
@@ -195,6 +195,11 @@ function AdminPage() {
                                   <p className="text-xs text-base-content/50 mt-1">
                                     Difficulty: {session.difficulty}
                                   </p>
+                                  {session.inviteCode && (
+                                    <p className="text-xs font-semibold text-primary mt-1">
+                                      Invite Code: {session.inviteCode}
+                                    </p>
+                                  )}
                                 </div>
                                 <div className="flex gap-2">
                                   <button
@@ -305,3 +310,5 @@ function AdminPage() {
 }
 
 export default AdminPage;
+
+

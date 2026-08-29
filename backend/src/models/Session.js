@@ -31,6 +31,13 @@ const sessionSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    inviteCode: {
+      type: String,
+      uppercase: true,
+      trim: true,
+      index: true,
+      default: "",
+    },
   },
   { timestamps: true }
 );
@@ -38,3 +45,4 @@ const sessionSchema = new mongoose.Schema(
 const Session = mongoose.model("Session", sessionSchema);
 
 export default Session;
+

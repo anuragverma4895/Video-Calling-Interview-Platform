@@ -9,6 +9,7 @@ import StatsCards from "../components/StatsCards";
 import ActiveSessions from "../components/ActiveSessions";
 import RecentSessions from "../components/RecentSessions";
 import CreateSessionModal from "../components/CreateSessionModal";
+import JoinSessionByCode from "../components/JoinSessionByCode";
 
 function DashboardPage() {
   const navigate = useNavigate();
@@ -52,6 +53,7 @@ function DashboardPage() {
       <div className="min-h-screen bg-base-300">
         <Navbar />
         <WelcomeSection onCreateSession={() => setShowCreateModal(true)} />
+        <JoinSessionByCode />
 
         {/* Grid layout */}
         <div className="container mx-auto px-6 pb-16">
@@ -84,3 +86,4 @@ function DashboardPage() {
 }
 
 export default DashboardPage;
+

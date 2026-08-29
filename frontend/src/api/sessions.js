@@ -20,8 +20,12 @@ export const sessionApi = {
     return response.data;
   },
 
-  joinSession: async (id) => {
-    const response = await axiosInstance.post(`/sessions/${id}/join`);
+  joinSession: async ({ id, inviteCode }) => {
+    const response = await axiosInstance.post(`/sessions/${id}/join`, { inviteCode });
+    return response.data;
+  },
+  joinSessionByCode: async (inviteCode) => {
+    const response = await axiosInstance.post("/sessions/join-by-code", { inviteCode });
     return response.data;
   },
   leaveSession: async (id) => {
@@ -57,3 +61,4 @@ export const sessionApi = {
     return response.data;
   },
 };
+

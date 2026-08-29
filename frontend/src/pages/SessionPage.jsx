@@ -8,7 +8,7 @@ import { doOutputsMatch } from "../lib/testExecution";
 import Navbar from "../components/Navbar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
 import { getDifficultyBadgeClass } from "../lib/utils";
-import { Loader2Icon, LogOutIcon, PhoneOffIcon, LockIcon, UnlockIcon } from "lucide-react";
+import { CopyIcon, KeyRoundIcon, Loader2Icon, LogOutIcon, PhoneOffIcon, LockIcon, UnlockIcon } from "lucide-react";
 import CodeEditorPanel from "../components/CodeEditorPanel";
 import OutputPanel from "../components/OutputPanel";
 
@@ -29,6 +29,7 @@ function SessionPage() {
 
   const [participantCanEdit, setParticipantCanEdit] = useState(false);
   const [accessRequested, setAccessRequested] = useState(false);
+  const [inviteCode, setInviteCode] = useState("");
 
   const { data: sessionData, isLoading: loadingSession, refetch } = useSessionById(id);
 
@@ -39,7 +40,6 @@ function SessionPage() {
   const isParticipant = session?.participant?.clerkId === user?.id;
   const hasInitiatedExitRef = useRef(false);
   const hasClosedSessionRef = useRef(false);
-  const hasAttemptedJoinRef = useRef(false);
   const isHostExitBlocked =
     isHost && session?.status === "active" && !hasClosedSessionRef.current;
 
@@ -79,15 +79,6 @@ function SessionPage() {
     [channel]
   );
 
-  useEffect(() => {
-    if (!session || !user || loadingSession) return;
-    if (isHost || isParticipant) return;
-    if (hasAttemptedJoinRef.current) return;
-
-    hasAttemptedJoinRef.current = true;
-    joinSessionMutation.mutate(id, { onSuccess: refetch });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session, user, loadingSession, isHost, isParticipant, id]);
 
   const sessionStatus = session?.status;
 
@@ -347,10 +338,80 @@ function SessionPage() {
     }
   };
 
+  const copyInviteCode = async () => {
+    if (!session?.inviteCode) return;
+
+    try {
+      await navigator.clipboard.writeText(session.inviteCode);
+      toast.success("Invite code copied");
+    } catch {
+      toast.error("Unable to copy invite code");
+    }
+  };
+
+  const handleJoinWithCode = (event) => {
+    event.preventDefault();
+
+    if (!inviteCode.trim()) {
+      toast.error("Enter the invite code to join this session");
+      return;
+    }
+
+    joinSessionMutation.mutate(
+      { id, inviteCode },
+      {
+        onSuccess: () => {
+          setInviteCode("");
+          refetch();
+        },
+      }
+    );
+  };
+
   const handleBlockedExitAttempt = useCallback(() => {
-    toast.error("Pehle session end kijiye, uske baad hi aap bahar aa sakte hain.");
+    toast.error("End the session before leaving as host.");
   }, []);
 
+  if (!loadingSession && session && !isHost && !isParticipant) {
+    return (
+      <div className="min-h-screen bg-base-300">
+        <Navbar />
+        <div className="min-h-[calc(100vh-80px)] flex items-center justify-center px-6 py-12">
+          <div className="card bg-base-100 shadow-xl border border-primary/20 max-w-md w-full">
+            <div className="card-body items-center text-center">
+              <div className="size-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <KeyRoundIcon className="size-8 text-primary" />
+              </div>
+              <h1 className="card-title text-2xl mt-2">Invite Code Required</h1>
+              <p className="text-base-content/65">
+                Enter the code shared by the host to join {session.problem}.
+              </p>
+              <form onSubmit={handleJoinWithCode} className="w-full space-y-4 mt-2">
+                <input
+                  className="input input-bordered w-full uppercase tracking-widest text-center"
+                  value={inviteCode}
+                  onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
+                  placeholder="ABC123"
+                  maxLength={6}
+                  autoFocus
+                />
+                <button
+                  type="submit"
+                  className="btn btn-primary w-full gap-2"
+                  disabled={joinSessionMutation.isPending}
+                >
+                  {joinSessionMutation.isPending && (
+                    <Loader2Icon className="size-4 animate-spin" />
+                  )}
+                  Join Session
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="h-screen bg-base-100 flex flex-col">
       <Navbar />
@@ -374,6 +435,18 @@ function SessionPage() {
                           Host: {session?.host?.name || "Loading..."} -{" "}
                           {session?.participant ? 2 : 1}/2 participants
                         </p>
+                        {isHost && session?.inviteCode && (
+                          <button
+                            type="button"
+                            onClick={copyInviteCode}
+                            className="btn btn-outline btn-xs gap-2 mt-3"
+                            title="Copy invite code"
+                          >
+                            <KeyRoundIcon className="size-3" />
+                            Invite Code: {session.inviteCode}
+                            <CopyIcon className="size-3" />
+                          </button>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-3">
@@ -593,3 +666,5 @@ function SessionPage() {
 }
 
 export default SessionPage;
+
+

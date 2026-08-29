@@ -1,8 +1,8 @@
-// Piston API code execution - uses backend proxy to avoid CORS issues
-
 import axiosInstance from "./axios";
 
 const DIRECT_EXECUTION_API = import.meta.env.VITE_PISTON_API_URL?.trim();
+const EXECUTION_UNAVAILABLE_MESSAGE =
+  "Code execution service is unavailable. Please try again later.";
 
 const LANGUAGE_VERSIONS = {
   javascript: { language: "javascript", version: "18.15.0" },
@@ -14,63 +14,58 @@ const LANGUAGE_VERSIONS = {
 
 /**
  * @param {string} language - programming language
- * @param {string} code - source code to executed
+ * @param {string} code - source code to execute
  * @returns {Promise<{success:boolean, output?:string, error?: string}>}
  */
 export async function executeCode(language, code) {
   const requestPayload = buildExecutionRequest(language, code);
 
-  try {
-    if (!requestPayload) {
-      return {
-        success: false,
-        error: `Unsupported language: ${language}`,
-      };
-    }
+  if (!requestPayload) {
+    return {
+      success: false,
+      error: `Unsupported language: ${language}`,
+    };
+  }
 
+  try {
     const response = await axiosInstance.post("/execute", requestPayload);
     const backendResult = toExecutionResult(response.data);
 
     if (shouldRetryDirectExecution(backendResult)) {
-      try {
-        const directResult = await executeCodeDirect(language, code, requestPayload);
-
-        if (directResult.success || !shouldRetryDirectExecution(directResult)) {
-          return directResult;
-        }
-      } catch {
-        return backendResult;
-      }
+      const directResult = await tryDirectExecution(language, code, requestPayload);
+      return directResult || backendResult;
     }
 
     return backendResult;
   } catch (error) {
-    // If backend proxy fails, try direct Piston API as fallback
-    try {
-      return await executeCodeDirect(language, code, requestPayload);
-    } catch (fallbackError) {
-      return {
+    const backendMessage = getApiErrorMessage(error);
+    const directResult = await tryDirectExecution(language, code, requestPayload);
+
+    return (
+      directResult || {
         success: false,
-        error: `Failed to execute code: ${
-          fallbackError.message || error.response?.data?.message || error.message
-        }`,
-      };
-    }
+        error: backendMessage || EXECUTION_UNAVAILABLE_MESSAGE,
+      }
+    );
   }
 }
 
-/**
- * Direct Piston API call as fallback
- */
-async function executeCodeDirect(language, code, requestPayload = buildExecutionRequest(language, code)) {
+async function tryDirectExecution(language, code, requestPayload) {
   if (!DIRECT_EXECUTION_API) {
-    return {
-      success: false,
-      error:
-        "No direct execution service is configured. Install the required compiler/runtime on the server or set VITE_PISTON_API_URL.",
-    };
+    return null;
   }
 
+  try {
+    return await executeCodeDirect(language, code, requestPayload);
+  } catch (error) {
+    return {
+      success: false,
+      error: error.message || EXECUTION_UNAVAILABLE_MESSAGE,
+    };
+  }
+}
+
+async function executeCodeDirect(language, code, requestPayload = buildExecutionRequest(language, code)) {
   const response = await fetch(normalizeExecutionServiceUrl(DIRECT_EXECUTION_API), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -78,10 +73,7 @@ async function executeCodeDirect(language, code, requestPayload = buildExecution
   });
 
   if (!response.ok) {
-    return {
-      success: false,
-      error: `HTTP error! status: ${response.status}`,
-    };
+    throw new Error(`Code execution service returned HTTP ${response.status}`);
   }
 
   const data = await response.json();
@@ -121,8 +113,15 @@ function buildExecutionFiles(language, code) {
 }
 
 function toExecutionResult(data) {
-  const output = data.run?.output || data.run?.stdout || "";
-  const stderr = data.run?.stderr || data.compile?.stderr || data.compile?.output || "";
+  if (data?.message || data?.error) {
+    return {
+      success: false,
+      error: data.message || data.error,
+    };
+  }
+
+  const output = data?.run?.output || data?.run?.stdout || "";
+  const stderr = data?.run?.stderr || data?.compile?.stderr || data?.compile?.output || "";
 
   if (stderr) {
     return {
@@ -139,7 +138,7 @@ function toExecutionResult(data) {
 }
 
 function shouldRetryDirectExecution(result) {
-  if (!result || result.success) {
+  if (!result || result.success || !DIRECT_EXECUTION_API) {
     return false;
   }
 
@@ -149,7 +148,18 @@ function shouldRetryDirectExecution(result) {
 }
 
 function normalizeExecutionServiceUrl(url) {
-  return url.endsWith("/execute") ? url : `${url.replace(/\/+$/, "")}/execute`;
+  const trimmedUrl = url.trim().replace(/\/+$/, "");
+  return trimmedUrl.endsWith("/execute") ? trimmedUrl : `${trimmedUrl}/execute`;
+}
+
+function getApiErrorMessage(error) {
+  const message = error.response?.data?.message || error.message || "";
+
+  if (/VITE_PISTON_API_URL|No direct execution service/i.test(message)) {
+    return EXECUTION_UNAVAILABLE_MESSAGE;
+  }
+
+  return message;
 }
 
 function getJavaFileName(sourceCode = "") {
@@ -194,3 +204,4 @@ function getFileExtension(language) {
       return "txt";
   }
 }
+

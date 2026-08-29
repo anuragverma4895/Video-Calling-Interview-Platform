@@ -15,8 +15,11 @@ router.post("/", async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error("Error executing code:", error);
-    res.status(500).json({ message: "Internal Server Error" });
+    res.status(502).json({
+      message: error.message || "Code execution service is unavailable. Please try again later.",
+    });
   }
 });
 
 export default router;
+

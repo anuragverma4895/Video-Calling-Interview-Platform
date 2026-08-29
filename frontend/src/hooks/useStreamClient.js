@@ -51,7 +51,7 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
         setStreamClient(client);
 
         videoCall = client.call("default", callId);
-        await videoCall.join({ create: true });
+        await videoCall.join();
 
         if (cancelled) return;
 
@@ -123,3 +123,4 @@ function useStreamClient(session, loadingSession, isHost, isParticipant) {
 }
 
 export default useStreamClient;
+

@@ -54,7 +54,7 @@ function CreateSessionModal({
             <div className="alert alert-success">
               <Code2Icon className="size-5" />
               <div>
-                <p className="font-semibold">Room Summary:</p>
+                <p className="font-semibold">Session Summary:</p>
                 <p>
                   Problem: <span className="font-medium">{roomConfig.problem}</span>
                 </p>
@@ -91,3 +91,4 @@ function CreateSessionModal({
   );
 }
 export default CreateSessionModal;
+

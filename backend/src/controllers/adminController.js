@@ -1,6 +1,6 @@
 import Session from "../models/Session.js";
 import User from "../models/User.js";
-import { completeSession, cleanupSessionResources } from "./sessionController.js";
+import { completeSession, cleanupSessionResources, ensureInviteCode } from "./sessionController.js";
 import { deleteStreamUser } from "../lib/stream.js";
 
 async function getOverviewPayload() {
@@ -12,10 +12,13 @@ async function getOverviewPayload() {
       .sort({ createdAt: -1 }),
   ]);
 
+  const activeSessions = sessions.filter((session) => session.status === "active");
+  await Promise.all(activeSessions.map((session) => ensureInviteCode(session)));
+
   const stats = {
     totalUsers: users.length,
     totalSessions: sessions.length,
-    activeSessions: sessions.filter((session) => session.status === "active").length,
+    activeSessions: activeSessions.length,
     completedSessions: sessions.filter((session) => session.status === "completed").length,
   };
 
@@ -118,3 +121,4 @@ export async function deleteUserAsAdmin(req, res) {
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+

@@ -12,7 +12,7 @@ export const useCreateSession = () => {
       queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
       toast.success("Session created successfully!");
     },
-    onError: (error) => toast.error(error.response?.data?.message || "Failed to create room"),
+    onError: (error) => toast.error(error.response?.data?.message || "Failed to create session"),
   });
 
   return result;
@@ -53,9 +53,30 @@ export const useJoinSession = () => {
   const result = useMutation({
     mutationKey: ["joinSession"],
     mutationFn: sessionApi.joinSession,
-    onSuccess: (_, id) => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
-      queryClient.invalidateQueries({ queryKey: ["session", id] });
+      queryClient.invalidateQueries({ queryKey: ["session", variables.id] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+      toast.success("Joined session successfully!");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || "Failed to join session"),
+  });
+
+  return result;
+};
+
+export const useJoinSessionByCode = () => {
+  const queryClient = useQueryClient();
+
+  const result = useMutation({
+    mutationKey: ["joinSessionByCode"],
+    mutationFn: sessionApi.joinSessionByCode,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ["activeSessions"] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+      if (data?.session?._id) {
+        queryClient.invalidateQueries({ queryKey: ["session", data.session._id] });
+      }
       toast.success("Joined session successfully!");
     },
     onError: (error) => toast.error(error.response?.data?.message || "Failed to join session"),
@@ -174,3 +195,5 @@ export const useAdminDeleteUser = () => {
 
   return result;
 };
+
+
