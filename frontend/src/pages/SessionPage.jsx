@@ -11,7 +11,7 @@ import {
   useUpdateSessionCode,
 } from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
-import { executeCode } from "../lib/piston";
+import { executeCode } from "../lib/codeExecution";
 import { doOutputsMatch } from "../lib/testExecution";
 import Navbar from "../components/Navbar";
 import { Panel, PanelGroup, PanelResizeHandle } from "react-resizable-panels";
@@ -696,6 +696,7 @@ function SessionPage() {
 }
 
 export default SessionPage;
+
 
 
 

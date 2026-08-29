@@ -17,12 +17,18 @@ services:
         scope: all
       - key: ADMIN_CLERK_IDS
         scope: all
-      - key: PISTON_API_URL
-        value: https://emkc.org/api/v2/piston/execute
-      - key: PISTON_API_TOKEN
+      - key: JUDGE0_API_URL
+        value: https://ce.judge0.com
+      - key: JUDGE0_API_KEY
         scope: all
-      - key: PISTON_API_TIMEOUT_MS
+      - key: JUDGE0_API_HOST
+        scope: all
+      - key: JUDGE0_API_TIMEOUT_MS
         value: 20000
+      - key: JUDGE0_POLL_INTERVAL_MS
+        value: 1000
+      - key: JUDGE0_MAX_POLL_ATTEMPTS
+        value: 20
       - key: INNGEST_EVENT_KEY
         scope: all
       - key: INNGEST_SIGNING_KEY
@@ -31,6 +37,7 @@ services:
         scope: all
       - key: STREAM_API_SECRET
         scope: all
+
 
 
 

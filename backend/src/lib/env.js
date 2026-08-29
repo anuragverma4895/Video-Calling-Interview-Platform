@@ -1,6 +1,11 @@
 import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
 
-dotenv.config({ quiet: true });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, "../../.env"), quiet: true });
 
 export const ENV = {
   PORT: process.env.PORT,
@@ -13,10 +18,10 @@ export const ENV = {
   INNGEST_SIGNING_KEY: process.env.INNGEST_SIGNING_KEY,
   STREAM_API_KEY: process.env.STREAM_API_KEY,
   STREAM_API_SECRET: process.env.STREAM_API_SECRET,
-  PISTON_API_URL: process.env.PISTON_API_URL,
-  PISTON_API_TOKEN: process.env.PISTON_API_TOKEN,
-  PISTON_API_TIMEOUT_MS: process.env.PISTON_API_TIMEOUT_MS,
+  JUDGE0_API_URL: process.env.JUDGE0_API_URL,
+  JUDGE0_API_KEY: process.env.JUDGE0_API_KEY,
+  JUDGE0_API_HOST: process.env.JUDGE0_API_HOST,
+  JUDGE0_API_TIMEOUT_MS: process.env.JUDGE0_API_TIMEOUT_MS,
+  JUDGE0_POLL_INTERVAL_MS: process.env.JUDGE0_POLL_INTERVAL_MS,
+  JUDGE0_MAX_POLL_ATTEMPTS: process.env.JUDGE0_MAX_POLL_ATTEMPTS,
 };
-
-
-

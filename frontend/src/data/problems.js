@@ -81,41 +81,32 @@ export const LANGUAGE_CONFIG = {
     name: "JavaScript",
     icon: "/javascript.png",
     monacoLang: "javascript",
-    pistonLang: "javascript",
-    pistonVersion: "18.15.0",
     fileExt: ".js",
   },
   python: {
     name: "Python",
     icon: "/python.png",
     monacoLang: "python",
-    pistonLang: "python",
-    pistonVersion: "3.10.0",
     fileExt: ".py",
   },
   java: {
     name: "Java",
     icon: "/java.png",
     monacoLang: "java",
-    pistonLang: "java",
-    pistonVersion: "15.0.2",
     fileExt: ".java",
   },
   c: {
     name: "C",
     icon: "/c.png",
     monacoLang: "c",
-    pistonLang: "c",
-    pistonVersion: "10.2.0",
     fileExt: ".c",
   },
   cpp: {
     name: "C++",
     icon: "/cpp.png",
     monacoLang: "cpp",
-    pistonLang: "c++",
-    pistonVersion: "10.2.0",
     fileExt: ".cpp",
   },
 };
+
 

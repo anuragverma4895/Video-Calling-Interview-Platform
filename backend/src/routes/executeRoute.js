@@ -12,8 +12,8 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ message: validationError });
     }
 
-    const { language, version, files } = req.body;
-    const result = await executeCode({ language, version, files });
+    const { language, version, files, stdin } = req.body;
+    const result = await executeCode({ language, version, files, stdin });
     res.status(200).json(result);
   } catch (error) {
     console.error("Error executing code:", error.message || error);
@@ -32,8 +32,12 @@ function validateExecutionRequest(body) {
     return "Language is required.";
   }
 
-  if (typeof body.version !== "string" || !body.version.trim()) {
-    return "Language version is required.";
+  if (body.version !== undefined && typeof body.version !== "string") {
+    return "Language version must be a string.";
+  }
+
+  if (body.stdin !== undefined && typeof body.stdin !== "string") {
+    return "Standard input must be a string.";
   }
 
   if (!Array.isArray(body.files) || body.files.length === 0) {
@@ -66,4 +70,5 @@ function getErrorStatus(error) {
 }
 
 export default router;
+
 

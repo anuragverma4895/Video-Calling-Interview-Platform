@@ -3,21 +3,16 @@ import axiosInstance from "./axios";
 const EXECUTION_UNAVAILABLE_MESSAGE =
   "Code execution service is unavailable. Please try again later.";
 
-const LANGUAGE_VERSIONS = {
-  javascript: { language: "javascript", version: "18.15.0" },
-  python: { language: "python", version: "3.10.0" },
-  java: { language: "java", version: "15.0.2" },
-  c: { language: "c", version: "10.2.0" },
-  cpp: { language: "c++", version: "10.2.0" },
-};
+const SUPPORTED_LANGUAGES = new Set(["javascript", "python", "java", "c", "cpp"]);
 
 /**
  * @param {string} language - programming language
  * @param {string} code - source code to execute
+ * @param {string} stdin - optional standard input
  * @returns {Promise<{success:boolean, output?:string, error?: string}>}
  */
-export async function executeCode(language, code) {
-  const requestPayload = buildExecutionRequest(language, code);
+export async function executeCode(language, code, stdin = "") {
+  const requestPayload = buildExecutionRequest(language, code, stdin);
 
   if (!requestPayload) {
     return {
@@ -37,17 +32,15 @@ export async function executeCode(language, code) {
   }
 }
 
-function buildExecutionRequest(language, code) {
-  const languageConfig = LANGUAGE_VERSIONS[language];
-
-  if (!languageConfig) {
+function buildExecutionRequest(language, code, stdin) {
+  if (!SUPPORTED_LANGUAGES.has(language)) {
     return null;
   }
 
   return {
-    language: languageConfig.language,
-    version: languageConfig.version,
+    language,
     files: buildExecutionFiles(language, code),
+    stdin,
   };
 }
 
