@@ -11,15 +11,13 @@ export async function executeCode({ language, version, files }) {
   try {
     const response = await fetch(pistonApiUrl, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: buildExecutionHeaders(),
       body: JSON.stringify({ language, version, files }),
       signal: controller.signal,
     });
 
     if (!response.ok) {
-      throw new Error(`Piston API Error: ${response.status} ${response.statusText}`);
+      throw new Error(getExecutionServiceError(response));
     }
 
     return response.json();
@@ -34,7 +32,27 @@ export async function executeCode({ language, version, files }) {
   }
 }
 
+function buildExecutionHeaders() {
+  const headers = {
+    "Content-Type": "application/json",
+  };
+
+  if (ENV.PISTON_API_TOKEN) {
+    headers.Authorization = `Bearer ${ENV.PISTON_API_TOKEN}`;
+  }
+
+  return headers;
+}
+
 function normalizeExecutionUrl(url) {
   const trimmedUrl = url.trim().replace(/\/+$/, "");
   return trimmedUrl.endsWith("/execute") ? trimmedUrl : `${trimmedUrl}/execute`;
 }
+function getExecutionServiceError(response) {
+  if (response.status === 401 || response.status === 403) {
+    return "Code execution authorization failed. Please contact the administrator.";
+  }
+
+  return `Code execution service returned HTTP ${response.status}. Please try again later.`;
+}
+

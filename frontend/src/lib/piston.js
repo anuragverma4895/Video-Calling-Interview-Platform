@@ -3,6 +3,8 @@ import axiosInstance from "./axios";
 const DIRECT_EXECUTION_API = import.meta.env.VITE_PISTON_API_URL?.trim();
 const EXECUTION_UNAVAILABLE_MESSAGE =
   "Code execution service is unavailable. Please try again later.";
+const EXECUTION_AUTH_MESSAGE =
+  "Code execution authorization failed. Please contact the administrator.";
 
 const LANGUAGE_VERSIONS = {
   javascript: { language: "javascript", version: "18.15.0" },
@@ -39,6 +41,14 @@ export async function executeCode(language, code) {
     return backendResult;
   } catch (error) {
     const backendMessage = getApiErrorMessage(error);
+
+    if (/(authentication|authorization) failed/i.test(backendMessage)) {
+      return {
+        success: false,
+        error: backendMessage,
+      };
+    }
+
     const directResult = await tryDirectExecution(language, code, requestPayload);
 
     return (
@@ -73,6 +83,10 @@ async function executeCodeDirect(language, code, requestPayload = buildExecution
   });
 
   if (!response.ok) {
+    if (response.status === 401 || response.status === 403) {
+      throw new Error(EXECUTION_UNAVAILABLE_MESSAGE);
+    }
+
     throw new Error(`Code execution service returned HTTP ${response.status}`);
   }
 
@@ -155,6 +169,10 @@ function normalizeExecutionServiceUrl(url) {
 function getApiErrorMessage(error) {
   const message = error.response?.data?.message || error.message || "";
 
+  if (/401|403|Unauthorized|Forbidden|authorization failed/i.test(message)) {
+    return EXECUTION_AUTH_MESSAGE;
+  }
+
   if (/VITE_PISTON_API_URL|No direct execution service/i.test(message)) {
     return EXECUTION_UNAVAILABLE_MESSAGE;
   }
@@ -204,4 +222,7 @@ function getFileExtension(language) {
       return "txt";
   }
 }
+
+
+
 

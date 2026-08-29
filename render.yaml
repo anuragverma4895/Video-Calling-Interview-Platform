@@ -19,8 +19,8 @@ services:
         scope: all
       - key: PISTON_API_URL
         value: https://emkc.org/api/v2/piston/execute
-      - key: VITE_PISTON_API_URL
-        value: https://emkc.org/api/v2/piston/execute
+      - key: PISTON_API_TOKEN
+        scope: all
       - key: INNGEST_EVENT_KEY
         scope: all
       - key: INNGEST_SIGNING_KEY
@@ -29,4 +29,6 @@ services:
         scope: all
       - key: STREAM_API_SECRET
         scope: all
+
+
 
