@@ -36,6 +36,22 @@ export const sessionApi = {
     const response = await axiosInstance.post(`/sessions/${id}/end`);
     return response.data;
   },
+  requestEditAccess: async (id) => {
+    const response = await axiosInstance.post(`/sessions/${id}/edit-access/request`);
+    return response.data;
+  },
+  grantEditAccess: async (id) => {
+    const response = await axiosInstance.post(`/sessions/${id}/edit-access/grant`);
+    return response.data;
+  },
+  revokeEditAccess: async (id) => {
+    const response = await axiosInstance.post(`/sessions/${id}/edit-access/revoke`);
+    return response.data;
+  },
+  updateSessionCode: async ({ id, code, language }) => {
+    const response = await axiosInstance.post(`/sessions/${id}/code`, { code, language });
+    return response.data;
+  },
   getStreamToken: async () => {
     const response = await axiosInstance.get(`/chat/token`);
     return response.data;
@@ -61,4 +77,5 @@ export const sessionApi = {
     return response.data;
   },
 };
+
 

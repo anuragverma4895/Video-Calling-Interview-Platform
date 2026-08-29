@@ -24,7 +24,12 @@ function CodeEditorPanel({
             alt={LANGUAGE_CONFIG[selectedLanguage].name}
             className="size-6"
           />
-          <select className="select select-sm" value={selectedLanguage} onChange={onLanguageChange}>
+          <select
+            className="select select-sm"
+            value={selectedLanguage}
+            onChange={onLanguageChange}
+            disabled={readOnly}
+          >
             {availableLanguages.map(([key, lang]) => (
               <option key={key} value={key}>
                 {lang.name}
@@ -74,3 +79,4 @@ function CodeEditorPanel({
   );
 }
 export default CodeEditorPanel;
+

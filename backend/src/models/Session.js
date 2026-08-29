@@ -21,6 +21,14 @@ const sessionSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    participantCanEdit: {
+      type: Boolean,
+      default: false,
+    },
+    editAccessRequested: {
+      type: Boolean,
+      default: false,
+    },
     status: {
       type: String,
       enum: ["active", "completed"],
@@ -38,6 +46,19 @@ const sessionSchema = new mongoose.Schema(
       index: true,
       default: "",
     },
+    currentCode: {
+      type: String,
+      default: "",
+    },
+    currentLanguage: {
+      type: String,
+      default: "javascript",
+    },
+    codeUpdatedBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
   },
   { timestamps: true }
 );
@@ -45,4 +66,5 @@ const sessionSchema = new mongoose.Schema(
 const Session = mongoose.model("Session", sessionSchema);
 
 export default Session;
+
 

@@ -1,7 +1,15 @@
 import { useUser } from "@clerk/clerk-react";
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useNavigate, useParams } from "react-router";
-import { useEndSession, useJoinSession, useSessionById } from "../hooks/useSessions";
+import {
+  useEndSession,
+  useGrantEditAccess,
+  useJoinSession,
+  useRequestEditAccess,
+  useRevokeEditAccess,
+  useSessionById,
+  useUpdateSessionCode,
+} from "../hooks/useSessions";
 import { PROBLEMS } from "../data/problems";
 import { executeCode } from "../lib/piston";
 import { doOutputsMatch } from "../lib/testExecution";
@@ -27,17 +35,21 @@ function SessionPage() {
   const [output, setOutput] = useState(null);
   const [isRunning, setIsRunning] = useState(false);
 
-  const [participantCanEdit, setParticipantCanEdit] = useState(false);
-  const [accessRequested, setAccessRequested] = useState(false);
   const [inviteCode, setInviteCode] = useState("");
 
   const { data: sessionData, isLoading: loadingSession, refetch } = useSessionById(id);
 
   const joinSessionMutation = useJoinSession();
   const endSessionMutation = useEndSession();
+  const requestEditAccessMutation = useRequestEditAccess();
+  const grantEditAccessMutation = useGrantEditAccess();
+  const revokeEditAccessMutation = useRevokeEditAccess();
+  const updateSessionCodeMutation = useUpdateSessionCode();
   const session = sessionData?.session;
   const isHost = session?.host?.clerkId === user?.id;
   const isParticipant = session?.participant?.clerkId === user?.id;
+  const participantCanEdit = Boolean(session?.participantCanEdit);
+  const accessRequested = Boolean(session?.editAccessRequested);
   const hasInitiatedExitRef = useRef(false);
   const hasClosedSessionRef = useRef(false);
   const isHostExitBlocked =
@@ -59,26 +71,30 @@ function SessionPage() {
 
   const isRemoteUpdate = useRef(false);
   const syncTimeoutRef = useRef(null);
+  const saveCodeTimeoutRef = useRef(null);
+  const lastLocalChangeRef = useRef(0);
 
-  const handleGrantAccess = useCallback(
-    async (targetUserId) => {
+  const sendSessionEvent = useCallback(
+    async (event) => {
       if (!channel) return;
 
       try {
-        await channel.sendEvent({
-          type: "custom",
-          custom_type: "access_grant",
-          target_user: targetUserId,
-        });
-        setParticipantCanEdit(true);
-        toast.success("Edit access granted!");
+        await channel.sendEvent(event);
       } catch {
-        toast.error("Failed to grant access");
+        // API state remains the source of truth if a realtime event is missed.
       }
     },
     [channel]
   );
 
+  const handleGrantAccess = useCallback(async () => {
+    grantEditAccessMutation.mutate(id, {
+      onSuccess: () => {
+        sendSessionEvent({ type: "edit_access_granted", target_user: session?.participant?.clerkId });
+        refetch();
+      },
+    });
+  }, [grantEditAccessMutation, id, refetch, sendSessionEvent, session?.participant?.clerkId]);
 
   const sessionStatus = session?.status;
 
@@ -104,15 +120,36 @@ function SessionPage() {
   }, [isHostExitBlocked]);
 
   useEffect(() => {
-    if (problemData?.starterCode?.[selectedLanguage]) {
-      setCode(problemData.starterCode[selectedLanguage]);
+    if (!problemData) return;
+    if (Date.now() - lastLocalChangeRef.current < 1000) return;
+
+    const hasSavedCode = Boolean(session?.codeUpdatedBy) || Boolean(session?.currentCode);
+
+    if (hasSavedCode && typeof session?.currentCode === "string") {
+      if (session.currentLanguage) {
+        setSelectedLanguage((currentLanguage) =>
+          currentLanguage === session.currentLanguage ? currentLanguage : session.currentLanguage
+        );
+      }
+      setCode((currentCode) =>
+        currentCode === session.currentCode ? currentCode : session.currentCode
+      );
+      return;
     }
-  }, [problemData, selectedLanguage]);
+
+    setCode((currentCode) => {
+      const starterCode = problemData.starterCode?.[selectedLanguage] || "";
+      return currentCode === starterCode ? currentCode : starterCode;
+    });
+  }, [problemData, selectedLanguage, session?.codeUpdatedBy, session?.currentCode, session?.currentLanguage]);
 
   useEffect(() => {
     return () => {
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
+      }
+      if (saveCodeTimeoutRef.current) {
+        clearTimeout(saveCodeTimeoutRef.current);
       }
     };
   }, []);
@@ -120,11 +157,13 @@ function SessionPage() {
   useEffect(() => {
     if (!channel) return;
 
-    const handleCustomEvent = (event) => {
-      const { type: eventType } = event;
+    const handleSessionEvent = (event) => {
+      const eventType = event.custom_type || event.type;
 
-      if (eventType === "custom" && event.custom_type === "code_sync") {
-        if (event.user?.id !== user?.id) {
+      if (eventType === "code_sync") {
+        const senderId = event.sender_id || event.user?.id;
+
+        if (senderId !== user?.id && typeof event.code === "string") {
           isRemoteUpdate.current = true;
           setCode(event.code);
           if (event.language) setSelectedLanguage(event.language);
@@ -134,22 +173,18 @@ function SessionPage() {
         }
       }
 
-      if (eventType === "custom" && event.custom_type === "access_grant") {
-        if (event.target_user === user?.id) {
-          setParticipantCanEdit(true);
-          setAccessRequested(false);
-          toast.success("Host granted you edit access!");
-        }
+      if (eventType === "edit_access_granted" && event.target_user === user?.id) {
+        refetch();
+        toast.success("Host granted you edit access!");
       }
 
-      if (eventType === "custom" && event.custom_type === "access_revoke") {
-        if (event.target_user === user?.id) {
-          setParticipantCanEdit(false);
-          toast("Host revoked your edit access.");
-        }
+      if (eventType === "edit_access_revoked" && event.target_user === user?.id) {
+        refetch();
+        toast("Host revoked your edit access.");
       }
 
-      if (eventType === "custom" && event.custom_type === "access_request" && isHost) {
+      if (eventType === "edit_access_requested" && isHost) {
+        refetch();
         toast(
           (toastItem) => (
             <div className="flex flex-col gap-2">
@@ -158,7 +193,7 @@ function SessionPage() {
                 <button
                   className="btn btn-success btn-xs"
                   onClick={() => {
-                    handleGrantAccess(event.requester_id);
+                    handleGrantAccess();
                     toast.dismiss(toastItem.id);
                   }}
                 >
@@ -178,9 +213,9 @@ function SessionPage() {
       }
     };
 
-    channel.on("custom", handleCustomEvent);
-    return () => channel.off("custom", handleCustomEvent);
-  }, [channel, user, isHost, handleGrantAccess]);
+    const subscription = channel.on(handleSessionEvent);
+    return () => subscription.unsubscribe();
+  }, [channel, user?.id, isHost, handleGrantAccess, refetch]);
 
   // Store isHost/isParticipant in refs so the cleanup function always has latest values
   // without adding them to the dep array (which would cause premature cleanup)
@@ -220,89 +255,83 @@ function SessionPage() {
     };
   }, [id]);
 
+  const saveCodeChange = useCallback(
+    (newCode, language) => {
+      if (!id || isRemoteUpdate.current) return;
+
+      if (saveCodeTimeoutRef.current) {
+        clearTimeout(saveCodeTimeoutRef.current);
+      }
+
+      saveCodeTimeoutRef.current = setTimeout(() => {
+        updateSessionCodeMutation.mutate({ id, code: newCode, language });
+      }, 600);
+    },
+    [id, updateSessionCodeMutation]
+  );
+
   const broadcastCodeChange = useCallback(
-    (newCode) => {
+    (newCode, language = selectedLanguage) => {
       if (!channel || isRemoteUpdate.current) return;
 
       if (syncTimeoutRef.current) {
         clearTimeout(syncTimeoutRef.current);
       }
 
-      syncTimeoutRef.current = setTimeout(async () => {
-        try {
-          await channel.sendEvent({
-            type: "custom",
-            custom_type: "code_sync",
-            code: newCode,
-            language: selectedLanguage,
-          });
-        } catch {
-          // Sync is best-effort only.
-        }
-      }, 300);
+      syncTimeoutRef.current = setTimeout(() => {
+        sendSessionEvent({
+          type: "code_sync",
+          code: newCode,
+          language,
+          sender_id: user?.id,
+        });
+      }, 150);
     },
-    [channel, selectedLanguage]
+    [channel, selectedLanguage, sendSessionEvent, user?.id]
   );
 
-  const handleCodeChange = (value) => {
+  const handleCodeChange = (value = "") => {
+    lastLocalChangeRef.current = Date.now();
     setCode(value);
-    broadcastCodeChange(value);
+    broadcastCodeChange(value, selectedLanguage);
+    saveCodeChange(value, selectedLanguage);
   };
 
   const handleRequestAccess = async () => {
-    if (!channel) return;
-
-    try {
-      await channel.sendEvent({
-        type: "custom",
-        custom_type: "access_request",
-        requester_id: user?.id,
-        requester_name: user?.fullName || user?.username || "Participant",
-      });
-      setAccessRequested(true);
-      toast.success("Access request sent to host!");
-    } catch {
-      toast.error("Failed to send request");
-    }
+    requestEditAccessMutation.mutate(id, {
+      onSuccess: () => {
+        sendSessionEvent({
+          type: "edit_access_requested",
+          requester_id: user?.id,
+          requester_name: user?.fullName || user?.username || "Participant",
+        });
+        refetch();
+      },
+    });
   };
 
   const handleRevokeAccess = useCallback(async () => {
-    if (!channel || !session?.participant) return;
+    revokeEditAccessMutation.mutate(id, {
+      onSuccess: () => {
+        sendSessionEvent({ type: "edit_access_revoked", target_user: session?.participant?.clerkId });
+        refetch();
+      },
+    });
+  }, [id, refetch, revokeEditAccessMutation, sendSessionEvent, session?.participant?.clerkId]);
 
-    try {
-      await channel.sendEvent({
-        type: "custom",
-        custom_type: "access_revoke",
-        target_user: session.participant.clerkId,
-      });
-      toast("Edit access revoked");
-    } catch {
-      toast.error("Failed to revoke access");
-    }
-  }, [channel, session?.participant]);
-
-  const canEdit = isHost || participantCanEdit;
+  const canEdit = isHost || (isParticipant && participantCanEdit);
 
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
-    setSelectedLanguage(newLang);
-
     const starterCode = problemData?.starterCode?.[newLang] || "";
+
+    lastLocalChangeRef.current = Date.now();
+    setSelectedLanguage(newLang);
     setCode(starterCode);
     setOutput(null);
-
-    if (channel && !isRemoteUpdate.current) {
-      channel
-        .sendEvent({
-          type: "custom",
-          custom_type: "code_sync",
-          code: starterCode,
-          language: newLang,
-        })
-        .catch(() => {});
-    }
+    broadcastCodeChange(starterCode, newLang);
+    saveCodeChange(starterCode, newLang);
   };
-
   const triggerConfetti = () => {
     confetti({ particleCount: 80, spread: 250, origin: { x: 0.2, y: 0.6 } });
     confetti({ particleCount: 80, spread: 250, origin: { x: 0.8, y: 0.6 } });
@@ -479,18 +508,15 @@ function SessionPage() {
                     </div>
 
                     {isHost && session?.participant && (
-                      <div className="flex items-center gap-2 mt-3 p-2 bg-base-200 rounded-lg">
+                      <div className="flex flex-wrap items-center gap-2 mt-3 p-2 bg-base-200 rounded-lg">
                         <span className="text-xs text-base-content/60">Participant Edit:</span>
+                        {accessRequested && !participantCanEdit && (
+                          <span className="badge badge-warning badge-sm">Access Requested</span>
+                        )}
                         <button
                           className="btn btn-xs btn-outline gap-1"
-                          onClick={
-                            participantCanEdit
-                              ? () => {
-                                  setParticipantCanEdit(false);
-                                  handleRevokeAccess();
-                                }
-                              : () => handleGrantAccess(session.participant.clerkId)
-                          }
+                          onClick={participantCanEdit ? handleRevokeAccess : handleGrantAccess}
+                          disabled={grantEditAccessMutation.isPending || revokeEditAccessMutation.isPending}
                         >
                           {participantCanEdit ? (
                             <>
@@ -508,7 +534,11 @@ function SessionPage() {
                     {isParticipant && !participantCanEdit && !accessRequested && (
                       <div className="mt-3 p-2 bg-warning/10 rounded-lg flex items-center justify-between">
                         <span className="text-xs text-warning">You are in read-only mode</span>
-                        <button className="btn btn-xs btn-warning" onClick={handleRequestAccess}>
+                        <button
+                          className="btn btn-xs btn-warning"
+                          onClick={handleRequestAccess}
+                          disabled={requestEditAccessMutation.isPending}
+                        >
                           Request Edit Access
                         </button>
                       </div>
@@ -666,5 +696,11 @@ function SessionPage() {
 }
 
 export default SessionPage;
+
+
+
+
+
+
 
 

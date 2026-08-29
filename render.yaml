@@ -21,6 +21,8 @@ services:
         value: https://emkc.org/api/v2/piston/execute
       - key: PISTON_API_TOKEN
         scope: all
+      - key: PISTON_API_TIMEOUT_MS
+        value: 20000
       - key: INNGEST_EVENT_KEY
         scope: all
       - key: INNGEST_SIGNING_KEY
@@ -29,6 +31,7 @@ services:
         scope: all
       - key: STREAM_API_SECRET
         scope: all
+
 
 
 

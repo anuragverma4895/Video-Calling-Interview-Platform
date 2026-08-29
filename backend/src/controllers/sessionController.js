@@ -58,6 +58,11 @@ function serializeSessionForUser(session, user, options = {}) {
   if (!canViewPrivateSessionData) {
     delete sessionObject.callId;
     delete sessionObject.inviteCode;
+    delete sessionObject.currentCode;
+    delete sessionObject.currentLanguage;
+    delete sessionObject.codeUpdatedBy;
+    delete sessionObject.participantCanEdit;
+    delete sessionObject.editAccessRequested;
   }
 
   return sessionObject;
@@ -66,7 +71,20 @@ function serializeSessionForUser(session, user, options = {}) {
 async function populateSession(sessionId) {
   return Session.findById(sessionId)
     .populate("host", "name email profileImage clerkId")
-    .populate("participant", "name email profileImage clerkId");
+    .populate("participant", "name email profileImage clerkId")
+    .populate("codeUpdatedBy", "name email profileImage clerkId");
+}
+
+function isSessionHost(session, userId) {
+  return getIdString(session?.host) === userId.toString();
+}
+
+function isSessionParticipant(session, userId) {
+  return getIdString(session?.participant) === userId.toString();
+}
+
+function canUserEditSession(session, userId) {
+  return isSessionHost(session, userId) || (isSessionParticipant(session, userId) && session.participantCanEdit);
 }
 
 export async function cleanupSessionResources(session) {
@@ -93,6 +111,8 @@ export async function completeSession(session) {
   await cleanupSessionResources(session);
   session.status = "completed";
   session.participant = null;
+  session.participantCanEdit = false;
+  session.editAccessRequested = false;
   await session.save();
   return session;
 }
@@ -116,7 +136,17 @@ export async function createSession(req, res) {
     const callId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const inviteCode = await createUniqueInviteCode();
 
-    session = await Session.create({ problem, difficulty, host: userId, callId, inviteCode });
+    session = await Session.create({
+      problem,
+      difficulty,
+      host: userId,
+      callId,
+      inviteCode,
+      participantCanEdit: false,
+      editAccessRequested: false,
+      currentLanguage: "javascript",
+      currentCode: "",
+    });
 
     await streamClient.video.call("default", callId).getOrCreate({
       data: {
@@ -253,7 +283,7 @@ async function joinSessionDocument(session, req) {
 
   const updatedSession = await Session.findOneAndUpdate(
     { _id: session._id, status: "active", participant: null },
-    { $set: { participant: userId } },
+    { $set: { participant: userId, participantCanEdit: false, editAccessRequested: false } },
     { new: true }
   );
 
@@ -305,6 +335,107 @@ export async function joinSessionByCode(req, res) {
   }
 }
 
+export async function requestEditAccess(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const session = await Session.findById(id);
+
+    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (session.status !== "active") return res.status(400).json({ message: "Cannot request access for a completed session" });
+    if (!isSessionParticipant(session, userId)) {
+      return res.status(403).json({ message: "Only the participant can request edit access" });
+    }
+
+    session.editAccessRequested = true;
+    await session.save();
+
+    const populatedSession = await populateSession(session._id);
+    res.status(200).json({ session: serializeSessionForUser(populatedSession, req.user), message: "Edit access requested" });
+  } catch (error) {
+    console.log("Error in requestEditAccess controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function grantEditAccess(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const session = await Session.findById(id);
+
+    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (session.status !== "active") return res.status(400).json({ message: "Cannot grant access for a completed session" });
+    if (!isSessionHost(session, userId)) {
+      return res.status(403).json({ message: "Only the host can grant edit access" });
+    }
+    if (!session.participant) {
+      return res.status(400).json({ message: "No participant is in this session" });
+    }
+
+    session.participantCanEdit = true;
+    session.editAccessRequested = false;
+    await session.save();
+
+    const populatedSession = await populateSession(session._id);
+    res.status(200).json({ session: serializeSessionForUser(populatedSession, req.user), message: "Edit access granted" });
+  } catch (error) {
+    console.log("Error in grantEditAccess controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function revokeEditAccess(req, res) {
+  try {
+    const { id } = req.params;
+    const userId = req.user._id;
+    const session = await Session.findById(id);
+
+    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (!isSessionHost(session, userId)) {
+      return res.status(403).json({ message: "Only the host can revoke edit access" });
+    }
+
+    session.participantCanEdit = false;
+    session.editAccessRequested = false;
+    await session.save();
+
+    const populatedSession = await populateSession(session._id);
+    res.status(200).json({ session: serializeSessionForUser(populatedSession, req.user), message: "Edit access revoked" });
+  } catch (error) {
+    console.log("Error in revokeEditAccess controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function updateSessionCode(req, res) {
+  try {
+    const { id } = req.params;
+    const { code, language } = req.body;
+    const userId = req.user._id;
+    const session = await Session.findById(id);
+
+    if (!session) return res.status(404).json({ message: "Session not found" });
+    if (session.status !== "active") return res.status(400).json({ message: "Cannot update code for a completed session" });
+    if (!canUserEditSession(session, userId)) {
+      return res.status(403).json({ message: "Edit access is required" });
+    }
+    if (typeof code !== "string" || typeof language !== "string") {
+      return res.status(400).json({ message: "Code and language are required" });
+    }
+
+    session.currentCode = code;
+    session.currentLanguage = language;
+    session.codeUpdatedBy = userId;
+    await session.save();
+
+    const populatedSession = await populateSession(session._id);
+    res.status(200).json({ session: serializeSessionForUser(populatedSession, req.user), message: "Code updated" });
+  } catch (error) {
+    console.log("Error in updateSessionCode controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
 export async function endSession(req, res) {
   try {
     if (!chatClient || !streamClient) {
@@ -361,6 +492,8 @@ export async function leaveSession(req, res) {
 
     if (session.participant?._id.toString() === userId) {
       session.participant = null;
+      session.participantCanEdit = false;
+      session.editAccessRequested = false;
       await session.save();
 
       const refreshedSession = await populateSession(id);
@@ -378,4 +511,5 @@ export async function leaveSession(req, res) {
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
+
 

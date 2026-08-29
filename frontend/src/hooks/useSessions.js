@@ -85,6 +85,70 @@ export const useJoinSessionByCode = () => {
   return result;
 };
 
+export const useRequestEditAccess = () => {
+  const queryClient = useQueryClient();
+
+  const result = useMutation({
+    mutationKey: ["requestEditAccess"],
+    mutationFn: sessionApi.requestEditAccess,
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["session", id] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+      toast.success("Edit access request sent");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || "Failed to request edit access"),
+  });
+
+  return result;
+};
+
+export const useGrantEditAccess = () => {
+  const queryClient = useQueryClient();
+
+  const result = useMutation({
+    mutationKey: ["grantEditAccess"],
+    mutationFn: sessionApi.grantEditAccess,
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["session", id] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+      toast.success("Edit access granted");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || "Failed to grant edit access"),
+  });
+
+  return result;
+};
+
+export const useRevokeEditAccess = () => {
+  const queryClient = useQueryClient();
+
+  const result = useMutation({
+    mutationKey: ["revokeEditAccess"],
+    mutationFn: sessionApi.revokeEditAccess,
+    onSuccess: (_, id) => {
+      queryClient.invalidateQueries({ queryKey: ["session", id] });
+      queryClient.invalidateQueries({ queryKey: ["adminOverview"] });
+      toast.success("Edit access revoked");
+    },
+    onError: (error) => toast.error(error.response?.data?.message || "Failed to revoke edit access"),
+  });
+
+  return result;
+};
+
+export const useUpdateSessionCode = () => {
+  const queryClient = useQueryClient();
+
+  const result = useMutation({
+    mutationKey: ["updateSessionCode"],
+    mutationFn: sessionApi.updateSessionCode,
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ["session", variables.id] });
+    },
+  });
+
+  return result;
+};
 export const useEndSession = () => {
   const queryClient = useQueryClient();
 
@@ -195,5 +259,6 @@ export const useAdminDeleteUser = () => {
 
   return result;
 };
+
 
 

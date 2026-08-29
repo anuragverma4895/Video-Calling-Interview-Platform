@@ -15,6 +15,8 @@ export const ENV = {
   STREAM_API_SECRET: process.env.STREAM_API_SECRET,
   PISTON_API_URL: process.env.PISTON_API_URL,
   PISTON_API_TOKEN: process.env.PISTON_API_TOKEN,
+  PISTON_API_TIMEOUT_MS: process.env.PISTON_API_TIMEOUT_MS,
 };
+
 
 
